@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
 
@@ -48,9 +49,21 @@ app.get('/', (req, res) => {
         version: '1.0.0',
         endpoints: {
             health: 'GET /',
-            allMechanics: 'GET /api/mechanics',
-            nearbyMechanics: 'GET /api/mechanics/nearby?latitude=XX&longitude=XX&radius=10',
-            mechanicById: 'GET /api/mechanics/:id'
+            mechanics: {
+                all: 'GET /api/mechanics',
+                nearby: 'GET /api/mechanics/nearby?latitude=XX&longitude=XX&radius=10',
+                byId: 'GET /api/mechanics/:id'
+            },
+            ms_mechanics: {
+                all: 'GET /api/ms-mechanics',
+                nearby: 'GET /api/ms-mechanics/nearby?latitude=XX&longitude=XX&radius=10',
+                byId: 'GET /api/ms-mechanics/:id',
+                create: 'POST /api/ms-mechanics',
+                update: 'PATCH /api/ms-mechanics/:id',
+                delete: 'DELETE /api/ms-mechanics/:id',
+                updateLocation: 'PUT /api/ms-mechanics/:id/location',
+                updateStatus: 'PUT /api/ms-mechanics/:id/status'
+            }
         }
     });
 });
@@ -300,6 +313,313 @@ app.get('/api/mechanics/:id', async (req, res) => {
     }
 });
 
+// ==================== MS_MECHANIC ROUTES ====================
+
+// Get all MS mechanics
+app.get('/api/ms-mechanics', async (req, res) => {
+    try {
+        const { verified, status, limit = 50 } = req.query;
+
+        let query = 'SELECT * FROM "MS_mechanic" WHERE 1=1';
+        const params = [];
+
+        if (verified !== undefined) {
+            params.push(verified === 'true');
+            query += ` AND is_verified = $${params.length}`;
+        }
+
+        if (status) {
+            params.push(status.toUpperCase());
+            query += ` AND status = $${params.length}`;
+        }
+
+        query += ` ORDER BY created_at DESC LIMIT $${params.length + 1}`;
+        params.push(parseInt(limit));
+
+        const result = await pool.query(query, params);
+
+        res.json({
+            success: true,
+            total: result.rows.length,
+            mechanics: result.rows
+        });
+    } catch (error) {
+        console.error('Error fetching MS mechanics:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch MS mechanics' });
+    }
+});
+
+// Get nearby MS mechanics
+app.get('/api/ms-mechanics/nearby', async (req, res) => {
+    try {
+        const { latitude, longitude, radius = 10, limit = 20, onlineOnly = false } = req.query;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json({
+                success: false,
+                error: 'Latitude and longitude are required',
+                example: '/api/ms-mechanics/nearby?latitude=23.0049&longitude=72.5487'
+            });
+        }
+
+        const userLat = parseFloat(latitude);
+        const userLon = parseFloat(longitude);
+        const searchRadius = parseFloat(radius);
+        const maxResults = parseInt(limit);
+
+        let query = `SELECT * FROM "MS_mechanic" WHERE shop_latitude IS NOT NULL AND shop_longitude IS NOT NULL`;
+
+        if (onlineOnly === 'true') {
+            query += ` AND status = 'ONLINE'`;
+        }
+
+        const result = await pool.query(query);
+
+        const mechanicsWithDistance = result.rows
+            .map(m => {
+                const mechanicLat = m.current_latitude || m.shop_latitude;
+                const mechanicLon = m.current_longitude || m.shop_longitude;
+                const distance = calculateDistance(userLat, userLon, mechanicLat, mechanicLon);
+                return { ...m, distance_km: distance, distance_text: distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance} km` };
+            })
+            .filter(m => m.distance_km <= searchRadius)
+            .sort((a, b) => a.distance_km - b.distance_km)
+            .slice(0, maxResults);
+
+        res.json({
+            success: true,
+            user_location: { latitude: userLat, longitude: userLon },
+            search_radius_km: searchRadius,
+            total_found: mechanicsWithDistance.length,
+            mechanics: mechanicsWithDistance
+        });
+    } catch (error) {
+        console.error('Error fetching nearby MS mechanics:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch nearby MS mechanics' });
+    }
+});
+
+// Get single MS mechanic by ID
+app.get('/api/ms-mechanics/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('SELECT * FROM "MS_mechanic" WHERE id = $1', [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'MS Mechanic not found' });
+        }
+
+        res.json({ success: true, mechanic: result.rows[0] });
+    } catch (error) {
+        console.error('Error fetching MS mechanic:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch MS mechanic' });
+    }
+});
+
+// Create new MS mechanic (all fields optional)
+app.post('/api/ms-mechanics', async (req, res) => {
+    try {
+        const {
+            shop_name, shop_address, shop_latitude, shop_longitude, is_verified, status,
+            user_id, KYC_document, adhar_card, current_latitude, current_longitude,
+            full_name, phone, email, yes_for_startup, notes, profile_photo, shop_photo, shop_google_map_link
+        } = req.body;
+
+        const query = `
+            INSERT INTO "MS_mechanic" (
+                shop_name, shop_address, shop_latitude, shop_longitude,
+                is_verified, status, user_id, "KYC_document", adhar_card,
+                current_latitude, current_longitude,
+                full_name, phone, email, yes_for_startup, notes,
+                profile_photo, shop_photo, shop_google_map_link
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+            RETURNING *
+        `;
+
+        const values = [
+            shop_name || null,
+            shop_address || null,
+            shop_latitude || null,
+            shop_longitude || null,
+            is_verified || false,
+            status || 'OFFLINE',
+            user_id || null,
+            KYC_document || null,
+            adhar_card || null,
+            current_latitude || null,
+            current_longitude || null,
+            full_name || null,
+            phone || null,
+            email || null,
+            yes_for_startup || false,
+            notes || null,
+            profile_photo || null,
+            shop_photo || null,
+            shop_google_map_link || null
+        ];
+
+        const result = await pool.query(query, values);
+
+        res.status(201).json({
+            success: true,
+            message: 'MS Mechanic created successfully',
+            mechanic: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error creating MS mechanic:', error);
+        res.status(500).json({ success: false, error: 'Failed to create MS mechanic' });
+    }
+});
+
+// Update MS mechanic (partial update)
+app.patch('/api/ms-mechanics/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+
+        // Check if mechanic exists
+        const existCheck = await pool.query('SELECT id FROM "MS_mechanic" WHERE id = $1', [id]);
+        if (existCheck.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'MS Mechanic not found' });
+        }
+
+        // Build dynamic update query
+        const allowedFields = [
+            'shop_name', 'shop_address', 'shop_latitude', 'shop_longitude',
+            'is_verified', 'status', 'user_id', 'KYC_document', 'adhar_card',
+            'current_latitude', 'current_longitude',
+            'full_name', 'phone', 'email', 'yes_for_startup', 'notes',
+            'profile_photo', 'shop_photo', 'shop_google_map_link'
+        ];
+
+        const setClauses = [];
+        const values = [];
+        let paramIndex = 1;
+
+        for (const [key, value] of Object.entries(updates)) {
+            if (allowedFields.includes(key)) {
+                const columnName = key === 'KYC_document' ? '"KYC_document"' : key;
+                setClauses.push(`${columnName} = $${paramIndex}`);
+                values.push(value);
+                paramIndex++;
+            }
+        }
+
+        if (setClauses.length === 0) {
+            return res.status(400).json({ success: false, error: 'No valid fields to update' });
+        }
+
+        setClauses.push(`updated_at = NOW()`);
+        values.push(id);
+
+        const query = `
+            UPDATE "MS_mechanic" 
+            SET ${setClauses.join(', ')}
+            WHERE id = $${paramIndex}
+            RETURNING *
+        `;
+
+        const result = await pool.query(query, values);
+
+        res.json({
+            success: true,
+            message: 'MS Mechanic updated successfully',
+            mechanic: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error updating MS mechanic:', error);
+        res.status(500).json({ success: false, error: 'Failed to update MS mechanic' });
+    }
+});
+
+// Delete MS mechanic
+app.delete('/api/ms-mechanics/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            'DELETE FROM "MS_mechanic" WHERE id = $1 RETURNING *',
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'MS Mechanic not found' });
+        }
+
+        res.json({
+            success: true,
+            message: 'MS Mechanic deleted successfully',
+            deleted: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error deleting MS mechanic:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete MS mechanic' });
+    }
+});
+
+// Update MS mechanic location
+app.put('/api/ms-mechanics/:id/location', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { latitude, longitude } = req.body;
+
+        const result = await pool.query(
+            `UPDATE "MS_mechanic" 
+             SET current_latitude = $1, current_longitude = $2, updated_at = NOW()
+             WHERE id = $3 RETURNING *`,
+            [latitude || null, longitude || null, id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'MS Mechanic not found' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Location updated',
+            mechanic: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error updating location:', error);
+        res.status(500).json({ success: false, error: 'Failed to update location' });
+    }
+});
+
+// Toggle MS mechanic status (ONLINE/OFFLINE)
+app.put('/api/ms-mechanics/:id/status', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        if (status && !['ONLINE', 'OFFLINE'].includes(status.toUpperCase())) {
+            return res.status(400).json({
+                success: false,
+                error: 'Status must be ONLINE or OFFLINE'
+            });
+        }
+
+        const result = await pool.query(
+            `UPDATE "MS_mechanic" 
+             SET status = $1, updated_at = NOW()
+             WHERE id = $2 RETURNING *`,
+            [status ? status.toUpperCase() : 'OFFLINE', id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'MS Mechanic not found' });
+        }
+
+        res.json({
+            success: true,
+            message: `Status changed to ${result.rows[0].status}`,
+            mechanic: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error updating status:', error);
+        res.status(500).json({ success: false, error: 'Failed to update status' });
+    }
+});
+
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ error: 'Route not found' });
@@ -314,11 +634,13 @@ app.use((err, req, res, next) => {
 // Export for Vercel
 module.exports = app;
 
-// For local development
-if (process.env.NODE_ENV !== 'production') {
+// Start server (Vercel sets VERCEL=1, so this won't run on Vercel)
+if (!process.env.VERCEL) {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 Server running on:`);
         console.log(`   Local:   http://localhost:${PORT}`);
     });
 }
+
+
