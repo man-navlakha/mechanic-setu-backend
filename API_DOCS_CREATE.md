@@ -18,6 +18,12 @@ You can include any of the following fields in your JSON body. **None are requir
 
 | Field Name | Type | Description | Example |
 |------------|------|-------------|---------|
+| `services_offered` | `string` | List of other services | `"towing, key_lockout, car_wash"` |
+| `fuel_delivery_types` | `string` | Fuel types delivered | `"petrol, diesel, cng"` |
+| `electric` | `boolean` | Support for EV? | `true` |
+| `electric_vehicle_types` | `string` | Types of EV supported | `"scooter, bike, car, rickshaw"` |
+| `special_skills` | `string` | Comma-separated list of skills | `"puncture, spark_plug, engine_oil"` |
+| `vehicle_type` | `string` | Vehicle specialization | `"BIKE_ONLY", "CAR_ONLY", "BOTH", "3_WHEELER", "ALL"` |
 | `full_name` | `string` | Mechanic's full name | `"Raju Bhai"` |
 | `phone` | `string` | Contact number | `"+919876543210"` |
 | `email` | `string` | Email address | `"raju@garage.com"` |
@@ -51,7 +57,8 @@ POST /api/ms-mechanics
 
 {
   "full_name": "Raju Bhai",
-  "shop_name": "Speedy Repairs"
+  "shop_name": "Speedy Repairs",
+  "vehicle_type": "BIKE_ONLY"
 }
 ```
 
@@ -66,6 +73,12 @@ POST /api/ms-mechanics
   "full_name": "Ramesh Kumar",
   "phone": "+919876543210",
   "email": "ramesh@mechanic.com",
+  "services_offered": "towing, car_wash, battery_jumpstart, key_lockout",
+  "fuel_delivery_types": "petrol, diesel",
+  "electric": true,
+  "electric_vehicle_types": "scooter, bike",
+  "special_skills": "puncture, oil_change, battery_jumpstart",
+  "vehicle_type": "BOTH",
   "shop_name": "Gujarat Motor Works",
   "shop_address": "Shop 4, Near Iscon Cross Road, Ahmedabad, Gujarat",
   "shop_latitude": 23.0225,

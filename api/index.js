@@ -422,7 +422,9 @@ app.post('/api/ms-mechanics', async (req, res) => {
         const {
             shop_name, shop_address, shop_latitude, shop_longitude, is_verified, status,
             user_id, KYC_document, adhar_card, current_latitude, current_longitude,
-            full_name, phone, email, yes_for_startup, notes, profile_photo, shop_photo, shop_google_map_link
+            full_name, phone, email, yes_for_startup, notes, profile_photo, shop_photo, shop_google_map_link,
+            special_skills, vehicle_type, electric, electric_vehicle_types, fuel_delivery_types,
+            services_offered
         } = req.body;
 
         const query = `
@@ -431,8 +433,11 @@ app.post('/api/ms-mechanics', async (req, res) => {
                 is_verified, status, user_id, "KYC_document", adhar_card,
                 current_latitude, current_longitude,
                 full_name, phone, email, yes_for_startup, notes,
-                profile_photo, shop_photo, shop_google_map_link
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+                profile_photo, shop_photo, shop_google_map_link,
+                special_skills, vehicle_type,
+                electric, electric_vehicle_types, fuel_delivery_types,
+                services_offered
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
             RETURNING *
         `;
 
@@ -455,7 +460,13 @@ app.post('/api/ms-mechanics', async (req, res) => {
             notes || null,
             profile_photo || null,
             shop_photo || null,
-            shop_google_map_link || null
+            shop_google_map_link || null,
+            special_skills || null,
+            vehicle_type || null,
+            electric || false,
+            electric_vehicle_types || null,
+            fuel_delivery_types || null,
+            services_offered || null
         ];
 
         const result = await pool.query(query, values);
@@ -489,7 +500,10 @@ app.patch('/api/ms-mechanics/:id', async (req, res) => {
             'is_verified', 'status', 'user_id', 'KYC_document', 'adhar_card',
             'current_latitude', 'current_longitude',
             'full_name', 'phone', 'email', 'yes_for_startup', 'notes',
-            'profile_photo', 'shop_photo', 'shop_google_map_link'
+            'profile_photo', 'shop_photo', 'shop_google_map_link',
+            'special_skills', 'vehicle_type',
+            'electric', 'electric_vehicle_types',
+            'fuel_delivery_types', 'services_offered'
         ];
 
         const setClauses = [];
