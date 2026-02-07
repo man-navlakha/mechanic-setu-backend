@@ -7,8 +7,10 @@ const errorHandler = require('../middleware/errorHandler');
 const healthRoutes = require('../routes/healthRoutes');
 const mechanicRoutes = require('../routes/mechanicRoutes');
 const msMechanicRoutes = require('../routes/msMechanicRoutes');
-
+const cookieParser = require('cookie-parser');
+const authRoutes = require('./auth');
 const app = express();
+app.use(cookieParser());
 
 // Middleware
 app.use(cors({
