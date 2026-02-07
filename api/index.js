@@ -3,7 +3,6 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
 const errorHandler = require('./helper/errorHandler');
-
 const healthRoutes = require('./routes/healthRoutes');
 const mechanicRoutes = require('./routes/mechanicRoutes');
 const msMechanicRoutes = require('./routes/msMechanicRoutes');
