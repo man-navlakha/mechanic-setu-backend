@@ -19,7 +19,8 @@ You can include any of the following fields in your JSON body. **None are requir
 | Field Name | Type | Description | Example |
 |------------|------|-------------|---------|
 | `services_offered` | `string` | List of other services | `"towing, key_lockout, car_wash"` |
-| `fuel_delivery_types` | `string` | Fuel types delivered | `"petrol, diesel, cng"` |
+| `working_hours` | `string` | Shop operating hours | `"Mon-Fri 9:30 to 10:30"` |
+| `fuel_delivery_types` | `string` | Fuel types delivered | `"petrol, diesel, cng, ev_charging"` |
 | `electric` | `boolean` | Support for EV? | `true` |
 | `electric_vehicle_types` | `string` | Types of EV supported | `"scooter, bike, car, rickshaw"` |
 | `special_skills` | `string` | Comma-separated list of skills | `"puncture, spark_plug, engine_oil"` |
@@ -74,6 +75,7 @@ POST /api/ms-mechanics
   "phone": "+919876543210",
   "email": "ramesh@mechanic.com",
   "services_offered": "towing, car_wash, battery_jumpstart, key_lockout",
+  "working_hours": "Mon-Fri 9:00 AM to 8:00 PM, Sat-Sun 10:00 AM to 6:00 PM",
   "fuel_delivery_types": "petrol, diesel",
   "electric": true,
   "electric_vehicle_types": "scooter, bike",

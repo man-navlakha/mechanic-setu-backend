@@ -424,7 +424,7 @@ app.post('/api/ms-mechanics', async (req, res) => {
             user_id, KYC_document, adhar_card, current_latitude, current_longitude,
             full_name, phone, email, yes_for_startup, notes, profile_photo, shop_photo, shop_google_map_link,
             special_skills, vehicle_type, electric, electric_vehicle_types, fuel_delivery_types,
-            services_offered
+            services_offered, working_hours
         } = req.body;
 
         const query = `
@@ -436,8 +436,8 @@ app.post('/api/ms-mechanics', async (req, res) => {
                 profile_photo, shop_photo, shop_google_map_link,
                 special_skills, vehicle_type,
                 electric, electric_vehicle_types, fuel_delivery_types,
-                services_offered
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+                services_offered, working_hours
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
             RETURNING *
         `;
 
@@ -466,7 +466,8 @@ app.post('/api/ms-mechanics', async (req, res) => {
             electric || false,
             electric_vehicle_types || null,
             fuel_delivery_types || null,
-            services_offered || null
+            services_offered || null,
+            working_hours || null
         ];
 
         const result = await pool.query(query, values);
@@ -503,7 +504,7 @@ app.patch('/api/ms-mechanics/:id', async (req, res) => {
             'profile_photo', 'shop_photo', 'shop_google_map_link',
             'special_skills', 'vehicle_type',
             'electric', 'electric_vehicle_types',
-            'fuel_delivery_types', 'services_offered'
+            'fuel_delivery_types', 'services_offered', 'working_hours'
         ];
 
         const setClauses = [];

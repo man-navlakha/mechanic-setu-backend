@@ -154,6 +154,7 @@ DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 | adhar_card | VARCHAR(50) | YES | Aadhaar number |
 | current_latitude | DOUBLE | YES | Live location |
 | current_longitude | DOUBLE | YES | Live location |
+| working_hours | TEXT | YES | Operating hours |
 | created_at | TIMESTAMP | YES | Creation time |
 | updated_at | TIMESTAMP | YES | Last update |
 
