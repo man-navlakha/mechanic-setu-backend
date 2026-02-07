@@ -24,6 +24,7 @@ app.use(express.json());
 
 // Use Routes
 app.use('/', healthRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/mechanics', mechanicRoutes);
 app.use('/api/ms-mechanics', msMechanicRoutes);
 

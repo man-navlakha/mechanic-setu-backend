@@ -12,20 +12,25 @@ if (result.error) {
 
 // --- CRITICAL STEP: Decode Keys from Base64 to String ---
 // 1. privateKey: Used to SIGN new Access Tokens (Write)
-const PRIVATE_KEY = Buffer.from(
-    process.env.PRIVATE_SIGNING_KEY, 
-    'base64'
-).toString('utf-8');
+const PRIVATE_KEY = process.env.PRIVATE_SIGNING_KEY 
+    ? Buffer.from(process.env.PRIVATE_SIGNING_KEY, 'base64').toString('utf-8')
+    : null;
 
 // 2. publicKey: Used to VERIFY existing Refresh Tokens (Read)
-const PUBLIC_KEY = Buffer.from(
-    process.env.PUBLIC_SIGNING_KEY, 
-    'base64'
-).toString('utf-8');
+const PUBLIC_KEY = process.env.PUBLIC_SIGNING_KEY 
+    ? Buffer.from(process.env.PUBLIC_SIGNING_KEY, 'base64').toString('utf-8')
+    : null;
 
 const ACCESS_EXPIRY = '30m'; 
 
 router.post('/refresh', (req, res) => {
+    if (!PRIVATE_KEY || !PUBLIC_KEY) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Authentication service not configured. Missing signing keys.' 
+        });
+    }
+    
     const refreshToken = req.cookies?.refresh || req.body?.refresh;
 
     if (!refreshToken) {
