@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const mechanicController = require('../controllers/mechanicController');
+const mechanicController = require('../controller/mechanicController');
 
 router.get('/nearby', mechanicController.getNearbyMechanics);
 router.get('/', mechanicController.getAllMechanics);

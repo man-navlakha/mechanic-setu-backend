@@ -1,4 +1,4 @@
-const pool = require('../config/db');
+const pool = require('../../db');
 const { calculateDistance } = require('../utils/geo');
 
 exports.getAllMsMechanics = async (req, res) => {
