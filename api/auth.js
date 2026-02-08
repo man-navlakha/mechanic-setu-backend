@@ -4,67 +4,93 @@ const router = express.Router();
 const dotenv = require('dotenv');
 
 // Load environment variables
-const result = dotenv.config({ path: '../.env' });
+const path = require('path');
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-if (result.error) {
-    console.warn("⚠️  .env file not found. Ensure environment variables are set manually.");
-}
+// --- CONFIGURATION MATCHING DJANGO SETTINGS ---
+// 1. Use the single SIGNING_KEY (HS256) instead of Private/Public keys
+const SIGNING_KEY = process.env.SIGNING_KEY;
 
-// --- CRITICAL STEP: Decode Keys from Base64 to String ---
-// 1. privateKey: Used to SIGN new Access Tokens (Write)
-const PRIVATE_KEY = process.env.PRIVATE_SIGNING_KEY 
-    ? Buffer.from(process.env.PRIVATE_SIGNING_KEY, 'base64').toString('utf-8')
-    : null;
-
-// 2. publicKey: Used to VERIFY existing Refresh Tokens (Read)
-const PUBLIC_KEY = process.env.PUBLIC_SIGNING_KEY 
-    ? Buffer.from(process.env.PUBLIC_SIGNING_KEY, 'base64').toString('utf-8')
-    : null;
-
-const ACCESS_EXPIRY = '30m'; 
+// 2. Match Lifetimes from Django settings
+const ACCESS_TOKEN_LIFETIME = '15m'; // timedelta(minutes=15)
+const REFRESH_TOKEN_LIFETIME = '7d'; // timedelta(days=7)
 
 router.post('/refresh', (req, res) => {
-    if (!PRIVATE_KEY || !PUBLIC_KEY) {
-        return res.status(503).json({ 
-            success: false, 
-            error: 'Authentication service not configured. Missing signing keys.' 
+    // 1. Check for Signing Key
+    if (!SIGNING_KEY) {
+        console.error("⚠️ SIGNING_KEY is missing in .env");
+        return res.status(503).json({
+            success: false,
+            error: 'Server configuration error.'
         });
     }
-    
-    const refreshToken = req.cookies?.refresh || req.body?.refresh;
 
-    if (!refreshToken) {
+    // 2. Get Refresh Token from Cookie (preferred) or Body
+    const rawRefreshToken = req.cookies?.refresh || req.body?.refresh;
+
+    if (!rawRefreshToken) {
         return res.status(401).json({ success: false, error: 'Refresh token is required' });
     }
 
-    // We use the Public Key to prove the token came from someone holding the Private Key (Django)
-    jwt.verify(refreshToken, PUBLIC_KEY, { algorithms: ['RS256'] }, (err, decodedUser) => {
+    // 3. Verify the existing Refresh Token
+    // We use the same SIGNING_KEY for verification in HS256
+    jwt.verify(rawRefreshToken, SIGNING_KEY, { algorithms: ['HS256'] }, (err, decodedPayload) => {
         if (err) {
-            return res.status(403).json({ success: false, error: 'Invalid or expired refresh token' });
+            console.error("Token verification failed:", err.message);
+            return res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
         }
 
-        // We must sign with the Private Key so that the Resource Server (Django/Node)
-        // can verify this new token using the Public Key later.
+        // 4. ROTATION LOGIC (Match Django's "ROTATE_REFRESH_TOKENS": True)
+
+        // Extract strictly necessary user data. 
+        // Django SimpleJWT puts the user ID in "user_id".
+        const payload = {
+            user_id: decodedPayload.user_id,
+            // Add other claims here if your Django custom user model adds them
+            // e.g., email: decodedPayload.email 
+        };
+
+        // A. Generate NEW Access Token
         const newAccessToken = jwt.sign(
-            { id: decodedUser.id, email: decodedUser.email }, 
-            PRIVATE_KEY, 
-            { 
-                algorithm: 'RS256', // Must specify algorithm
-                expiresIn: ACCESS_EXPIRY 
-            }
+            { ...payload, token_type: 'access' }, // Standard SimpleJWT claims
+            SIGNING_KEY,
+            { expiresIn: ACCESS_TOKEN_LIFETIME, algorithm: 'HS256' }
         );
 
-        res.cookie('access', newAccessToken, {
+        // B. Generate NEW Refresh Token (Rotation)
+        const newRefreshToken = jwt.sign(
+            { ...payload, token_type: 'refresh' }, // Standard SimpleJWT claims
+            SIGNING_KEY,
+            { expiresIn: REFRESH_TOKEN_LIFETIME, algorithm: 'HS256' }
+        );
+
+        // 5. Set Cookies (Matching Django's set_auth_cookies)
+        const cookieOptions = {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'None',
-            maxAge: 30 * 60 * 1000 
+            secure: process.env.NODE_ENV === 'production', // True in prod
+            sameSite: 'None', // Matches your Django "samesite": "None"
+            path: '/'
+        };
+
+        // Set Access Cookie (15 mins)
+        res.cookie('access', newAccessToken, {
+            ...cookieOptions,
+            maxAge: 15 * 60 * 1000
         });
 
-        res.json({ 
-            success: true, 
-            accessToken: newAccessToken,
-            message: "Access token refreshed successfully" 
+        // Set Refresh Cookie (7 days)
+        res.cookie('refresh', newRefreshToken, {
+            ...cookieOptions,
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
+        // 6. Respond
+        res.json({
+            success: true,
+            message: "Tokens refreshed successfully",
+            // Optional: return tokens in body if your frontend needs them immediately
+            // access: newAccessToken,
+            // refresh: newRefreshToken
         });
     });
 });

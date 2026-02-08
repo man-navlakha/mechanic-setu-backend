@@ -249,6 +249,28 @@ const isQuotaExceeded = (response) => {
 };
 
 /**
+ * Link a vehicle to a user in the user_vehicles table
+ */
+const linkVehicleToUser = async (userId, vehicleId, isOwner = false) => {
+    try {
+        const query = `
+            INSERT INTO user_vehicles (user_id, vehicle_id, is_owner)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, vehicle_id) 
+            DO UPDATE SET 
+                is_owner = EXCLUDED.is_owner,
+                created_at = NOW()
+            RETURNING *;
+        `;
+        const result = await pool.query(query, [userId, vehicleId, isOwner]);
+        return result.rows[0];
+    } catch (error) {
+        console.error('Error linking vehicle to user:', error.message);
+        return null;
+    }
+};
+
+/**
  * Get vehicle information by registration number
  * @route POST /api/vehicle/rc-info
  * @body { vehicle_number: string }
@@ -309,6 +331,11 @@ const getVehicleRCInfo = async (req, res) => {
                 // Ensure vehicle_image is in the response sent to frontend
                 if (typeof responseData === 'object') {
                     responseData.vehicle_image = dbData.vehicle_image || responseData.vehicle_image;
+                }
+
+                // Link vehicle to user if authenticated
+                if (req.user && req.user.id) {
+                    await linkVehicleToUser(req.user.id, normalizedVehicleNumber);
                 }
 
                 return res.status(200).json({
@@ -379,6 +406,11 @@ const getVehicleRCInfo = async (req, res) => {
         try {
             savedData = await saveVehicleRCInfo(apiResponse);
             console.log(`✅ Vehicle data saved to database: ${normalizedVehicleNumber}`);
+
+            // Link vehicle to user if authenticated
+            if (req.user && req.user.id) {
+                await linkVehicleToUser(req.user.id, normalizedVehicleNumber);
+            }
         } catch (dbError) {
             console.error('❌ Error saving to database:', dbError.message);
             // Continue even if database save fails
@@ -523,9 +555,66 @@ const deleteSavedVehicle = async (req, res) => {
     }
 };
 
+/**
+ * Get vehicles linked to the current authenticated user
+ * @route GET /api/vehicle/my-vehicles
+ */
+const getMyVehicles = async (req, res) => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({
+                success: false,
+                error: 'Authentication required'
+            });
+        }
+
+        const userId = req.user.id;
+        const { limit = 50, offset = 0 } = req.query;
+
+        const query = `
+            SELECT v.*, uv.is_owner, uv.notification_enabled, uv.created_at as saved_at
+            FROM vehicle_rc_info v
+            JOIN user_vehicles uv ON v.vehicle_id = uv.vehicle_id
+            WHERE uv.user_id = $1
+            ORDER BY uv.created_at DESC
+            LIMIT $2 OFFSET $3
+        `;
+
+        const result = await pool.query(query, [userId, parseInt(limit), parseInt(offset)]);
+
+        // Process data
+        const vehicles = result.rows.map(vehicle => {
+            if (!vehicle.vehicle_image && vehicle.brand_name && vehicle.brand_model) {
+                vehicle.vehicle_image = generateCarImageUrl(vehicle.brand_name, vehicle.brand_model, vehicle.class);
+            }
+
+            // Add insurance status helper
+            const today = new Date();
+            const expiry = vehicle.insurance_expiry ? new Date(vehicle.insurance_expiry) : null;
+            vehicle.is_insurance_expired = expiry ? expiry < today : null;
+
+            return vehicle;
+        });
+
+        res.status(200).json({
+            success: true,
+            data: vehicles,
+            count: vehicles.length
+        });
+    } catch (error) {
+        console.error('Error fetching user vehicles:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch your vehicles',
+            message: error.message
+        });
+    }
+};
+
 module.exports = {
     getVehicleRCInfo,
     getSavedVehicles,
     getSavedVehicleById,
-    deleteSavedVehicle
+    deleteSavedVehicle,
+    getMyVehicles
 };

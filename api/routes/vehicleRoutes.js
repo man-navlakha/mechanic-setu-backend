@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const vehicleController = require('../controller/vehicleController');
+const { authenticateToken } = require('../helper/authMiddleware');
 
 /**
  * POST /api/vehicle/rc-info
  * Get vehicle registration certificate information from RapidAPI and save to database
  * Body: { vehicle_number: string }
  */
-router.post('/rc-info', vehicleController.getVehicleRCInfo);
+router.post('/rc-info', authenticateToken, vehicleController.getVehicleRCInfo);
 
 /**
  * GET /api/vehicle/saved
@@ -15,6 +16,12 @@ router.post('/rc-info', vehicleController.getVehicleRCInfo);
  * Query: ?limit=50&offset=0&search=search_term
  */
 router.get('/saved', vehicleController.getSavedVehicles);
+
+/**
+ * GET /api/vehicle/my-vehicles
+ * Get vehicles belonging to the current user
+ */
+router.get('/my-vehicles', authenticateToken, vehicleController.getMyVehicles);
 
 /**
  * GET /api/vehicle/saved/:vehicleId

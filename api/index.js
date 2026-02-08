@@ -9,6 +9,7 @@ const msMechanicRoutes = require('./routes/msMechanicRoutes');
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./auth');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
 app.use(cookieParser());
@@ -17,8 +18,10 @@ app.use(cookieParser());
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
-    'https://mechanic-setu.vercel.app' // Add your production URL here
-];
+    'http://mechanicsetu.netlify.app',
+    'https://mechanic-setu.vercel.app', // Add your production URL here
+    process.env.FRONTEND_URL // Dynamic from .env
+].filter(Boolean); // Remove undefined/null values
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -45,6 +48,42 @@ app.use('/api/auth', authRoutes);
 app.use('/api/mechanics', mechanicRoutes);
 app.use('/api/ms-mechanics', msMechanicRoutes);
 app.use('/api/vehicle', vehicleRoutes);
+
+// ==================== PROXY TO DJANGO (RENDER) ====================
+// This handles all requests that are not defined in the Node backend
+// but are needed by the frontend (e.g., /api/core/me, /api/auth/login)
+const RENDER_BACKEND_URL = process.env.RENDER_BACKEND_URL || 'https://mechanic-setu.onrender.com';
+
+const djangoProxy = createProxyMiddleware({
+    target: RENDER_BACKEND_URL,
+    changeOrigin: true,
+    secure: false, // Set to true if certificates are valid
+    ws: true, // proxy websockets
+    pathRewrite: {
+        // You can add rewrites here if needed
+    },
+    onProxyReq: (proxyReq, req, res) => {
+        // Forward auth cookies if they exist
+        if (req.cookies?.access) {
+            proxyReq.setHeader('Authorization', `Bearer ${req.cookies.access}`);
+        }
+    },
+    onError: (err, req, res) => {
+        console.error('Proxy Error:', err.message);
+        res.status(502).json({
+            success: false,
+            error: 'Backend proxy error',
+            message: 'Could not connect to the Render backend.'
+        });
+    }
+});
+
+// Proxy specific paths to Django
+// Add any other paths your Django backend handles
+app.use('/api/core', djangoProxy);
+app.use('/api/auth/login', djangoProxy);
+app.use('/api/auth/register', djangoProxy);
+// app.use('/', djangoProxy); // Optional: Catch-all proxy (careful with overlaps)
 
 // 404 handler
 app.use((req, res) => {
