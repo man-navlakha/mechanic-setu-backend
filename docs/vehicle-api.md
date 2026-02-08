@@ -76,9 +76,24 @@ RAPIDAPI_KEY_BACKUP_1=your_second_backup_rapidapi_key_here
 
 **Current Keys:** Available in `.env` file
 
-### API Key Fallback
+### Database First Strategy (Quota Saving)
 
-The system automatically implements a **multi-tier fallback mechanism** for API keys:
+To protect your limited API quota (5 requests/day per key), the system implements a **Database First** check:
+
+1. **DB Lookup**: Every request first checks the local `vehicle_rc_info` table.
+2. **Cache Hit**: If the vehicle information already exists in the database, it is served immediately without calling the external API.
+3. **Cache Miss**: Only if the vehicle is not found locally does the system proceed to the API rotation chain.
+4. **Auto-Caching**: When data is successfully fetched from the API, it is automatically stored in the database for all future requests.
+
+**Response Source:**
+- When data comes from the DB, the response includes `"source": "database"`.
+- When data comes from the API, the response includes `"source": "api"`.
+
+This strategy ensures that once you've paid for a vehicle lookup once, you never have to pay for it again!
+
+### Multi-tier Fallback Mechanism
+
+If a cache miss occurs and the system calls the API:
 
 1. **Chain of Keys**: The system sequentially tries `RAPIDAPI_KEY`, then `RAPIDAPI_KEY_BACKUP`, and finally `RAPIDAPI_KEY_BACKUP_1`.
 2. **Quota Detection**: If a key has exceeded its daily quota, the system automatically detects the error message.
