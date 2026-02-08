@@ -6,6 +6,7 @@ const errorHandler = require('./helper/errorHandler');
 const healthRoutes = require('./routes/healthRoutes');
 const mechanicRoutes = require('./routes/mechanicRoutes');
 const msMechanicRoutes = require('./routes/msMechanicRoutes');
+const vehicleRoutes = require('./routes/vehicleRoutes');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./auth');
 
@@ -27,6 +28,7 @@ app.use('/', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/mechanics', mechanicRoutes);
 app.use('/api/ms-mechanics', msMechanicRoutes);
+app.use('/api/vehicle', vehicleRoutes);
 
 // 404 handler
 app.use((req, res) => {

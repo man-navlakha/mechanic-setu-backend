@@ -131,10 +131,51 @@ Content-Type: application/json
 
 ---
 
+## 🚗 Vehicle RC Information API
+
+### Get Vehicle RC Details
+```
+POST /api/vehicle/rc-info
+Content-Type: application/json
+
+{
+  "vehicle_number": "GJ27AA3978"
+}
+```
+
+**Features:**
+- Fetches vehicle registration certificate information
+- **Automatically saves to database** for future reference
+- **Automatic API key fallback** when quota exceeded
+- Validates vehicle number format
+- Powered by RapidAPI Vehicle RC Information V2
+
+**Additional Endpoints:**
+- `GET /api/vehicle/saved` - Get all saved vehicles
+- `GET /api/vehicle/saved/:vehicleId` - Get specific vehicle from DB
+- `DELETE /api/vehicle/saved/:vehicleId` - Delete saved vehicle
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    // Vehicle RC information
+  }
+}
+```
+
+📖 **Full Documentation**: [docs/vehicle-api.md](docs/vehicle-api.md)
+
+---
+
 ## 📦 Environment Variables
 
 ```env
 DATABASE_URL=postgresql://user:password@host/database?sslmode=require
+RAPIDAPI_KEY=your_primary_rapidapi_key_here
+RAPIDAPI_KEY_BACKUP=your_backup_rapidapi_key_here
+RAPIDAPI_KEY_BACKUP_1=your_second_backup_rapidapi_key_here
 ```
 
 ## 🗃️ Database Tables
