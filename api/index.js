@@ -18,7 +18,7 @@ app.use(cookieParser());
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
-    'http://mechanicsetu.netlify.app',
+    'https://mechanicsetu.netlify.app',
     'https://mechanic-setu.vercel.app', // Add your production URL here
     process.env.FRONTEND_URL // Dynamic from .env
 ].filter(Boolean); // Remove undefined/null values
