@@ -241,11 +241,12 @@ const makeRapidAPIRequest = (vehicle_number, apiKey) => {
  * Check if response indicates quota exceeded
  */
 const isQuotaExceeded = (response) => {
-    return response &&
-        response.message &&
-        (response.message.includes('exceeded the DAILY quota') ||
-            response.message.includes('exceeded') ||
-            response.message.includes('quota'));
+    if (!response || !response.message) return false;
+    const message = response.message.toLowerCase();
+
+    return message.includes('exceeded') ||
+        message.includes('quota') ||
+        message.includes('limit reached');
 };
 
 /**
@@ -393,6 +394,22 @@ const getVehicleRCInfo = async (req, res) => {
                 success: false,
                 error: 'All API keys have exceeded quota or failed',
                 message: apiResponse ? apiResponse.message : 'No response from API service'
+            });
+        }
+
+        // --- VALIDATION STEP ---
+        // Before attempting to save, ensure the API returned actual vehicle data.
+        // An API can return a 200 OK with a message like "vehicle not found".
+        // We check for a key field that should always be present in a valid response.
+        // The `saveVehicleRCInfo` function relies on `license_plate`.
+        if (!apiResponse.license_plate) {
+            console.log(`⚠️ API response for ${normalizedVehicleNumber} is missing 'license_plate'. Cannot save to DB.`, apiResponse);
+            // Forward the API's response to the client so they know why it failed.
+            return res.status(404).json({
+                success: false,
+                error: `Vehicle not found or external API did not return complete data.`,
+                data: apiResponse,
+                source: 'api'
             });
         }
 
