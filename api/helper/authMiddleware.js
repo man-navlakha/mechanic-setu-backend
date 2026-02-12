@@ -1,54 +1,50 @@
 const jwt = require('jsonwebtoken');
-const dotenv = require('dotenv');
-const path = require('path');
 
-// Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
-
+// This must match the key used in Django SimpleJWT for HS256 signing.
 const SIGNING_KEY = process.env.SIGNING_KEY;
 
 /**
- * Middleware to verify JWT token from Authorization header or cookies
+ * Middleware to authenticate a user via JWT in the 'access' cookie.
+ * This mirrors Django's CookieJWTAuthentication and is used by protected routes.
  */
 const authenticateToken = (req, res, next) => {
+    // 1. Ensure the server is configured with a secret key
     if (!SIGNING_KEY) {
-        console.warn("⚠️  Authentication SIGNING_KEY not configured.");
+        console.error("⚠️ SIGNING_KEY is missing in .env for token verification.");
         return res.status(503).json({
             success: false,
-            error: 'Authentication service not configured.'
+            error: 'Server configuration error.'
         });
     }
 
-    // Try to get token from header or cookies
-    const authHeader = req.headers['authorization'];
-    const token = (authHeader && authHeader.split(' ')[1]) || req.cookies?.access;
+    // 2. Extract token from the 'access' cookie
+    const token = req.cookies.access;
 
     if (!token) {
+        console.warn('[authMiddleware] No access cookie. headers.cookie=', req.headers.cookie);
         return res.status(401).json({
             success: false,
-            error: 'Access token is required. Please login.'
+            error: "Authentication credentials were not provided."
         });
     }
 
-    jwt.verify(token, SIGNING_KEY, { algorithms: ['HS256'] }, (err, decoded) => {
-        if (err) {
-            console.error('JWT Verification Error:', err.message);
-            return res.status(403).json({
-                success: false,
-                error: 'Invalid or expired access token'
-            });
-        }
+    // 3. Verify the token
+    try {
+        // Verify using the same secret and algorithm (HS256) as Django
+        const decoded = jwt.verify(token, SIGNING_KEY, { algorithms: ['HS256'] });
 
-        // Add user info to request
-        // Django SimpleJWT uses 'user_id', we map it to req.user.id for consistency
-        req.user = {
-            ...decoded,
-            id: decoded.user_id || decoded.id
-        };
+        // Attach user info to the request object. Django SimpleJWT puts the user ID in 'user_id'.
+        // Other controllers expect `req.user` with id and email for downstream logic.
+        req.user = { id: decoded.user_id, email: decoded.email };
         next();
-    });
+    } catch (err) {
+        // This will catch expired tokens, invalid signatures, etc.
+        return res.status(401).json({
+            success: false,
+            error: "Invalid or expired token",
+            detail: err.message
+        });
+    }
 };
 
-module.exports = {
-    authenticateToken
-};
+module.exports = { authenticateToken };

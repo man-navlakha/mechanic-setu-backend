@@ -8,10 +8,16 @@ const mechanicRoutes = require('./routes/mechanicRoutes');
 const msMechanicRoutes = require('./routes/msMechanicRoutes');
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const cookieParser = require('cookie-parser');
-const authRoutes = require('./auth');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 app.use(cookieParser());
+
+// Simple request logger (for debugging routing/proxy issues)
+app.use((req, _res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 // Middleware
 const allowedOrigins = [
@@ -43,15 +49,15 @@ app.use(express.json());
 
 // Use Routes
 app.use('/', healthRoutes);
-app.use('/api/auth', authRoutes);
+
+// Auth routes mounted at multiple prefixes to tolerate dev proxy misconfigs
+app.use('/api', authRoutes);
+app.use('/', authRoutes);        // handles proxies that strip /api prefix
+
 app.use('/api/mechanics', mechanicRoutes);
 app.use('/api/ms-mechanics', msMechanicRoutes);
 app.use('/api/vehicle', vehicleRoutes);
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ error: 'Route not found' });
-});
 
 // Error handler
 app.use(errorHandler);
