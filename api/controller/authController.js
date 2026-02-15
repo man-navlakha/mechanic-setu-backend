@@ -1,38 +1,34 @@
 const pool = require('../../db');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 const { v4: uuidv4 } = require('uuid');
 const { OAuth2Client } = require('google-auth-library');
+const { deliverOtpEmail } = require('../helper/otpEmail');
 
 const SIGNING_KEY = process.env.SIGNING_KEY;
 const ACCESS_TOKEN_LIFETIME = process.env.ACCESS_TOKEN_LIFETIME || '15m';
 const REFRESH_TOKEN_LIFETIME = process.env.REFRESH_TOKEN_LIFETIME || '7d';
 const OTP_EXPIRATION_MINUTES = parseInt(process.env.OTP_EXPIRATION_MINUTES || '5', 10);
 const NODE_ENV = process.env.NODE_ENV || 'development';
-const secureCookie = NODE_ENV === 'production';
-const sameSitePolicy = secureCookie ? 'None' : 'Lax';
+
+// For cross-site cookies (e.g., frontend at 5173, backend at 3000),
+// SameSite must be 'None' and the cookie must be 'Secure'.
+// Modern browsers often treat localhost as a secure context, allowing this.
+const isProduction = NODE_ENV === 'production';
+
+// Default to true in production. In dev, we also set to true to enable cross-site cookies.
+const secureCookie = process.env.COOKIE_SECURE !== undefined
+  ? (process.env.COOKIE_SECURE === 'true')
+  : true; // Set to true for both production and local cross-site development
+
+// 'None' is required for cross-origin contexts. 'Lax' is too restrictive.
+const sameSitePolicy = process.env.COOKIE_SAMESITE || 'None';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CSRF_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const COOKIE_PATH = '/';
 const OTP_TABLE = 'auth_otp_sessions';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_REGEX = /^\+?\d{7,15}$/;
-
-const OTP_EMAIL_FROM = process.env.OTP_EMAIL_FROM || '"Mechanic Setu" <noreply@mechanicsetu.com>';
-
-let otpTransporter = null;
-if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
-  otpTransporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASSWORD
-    }
-  });
-}
 
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
@@ -99,6 +95,11 @@ const buildTokens = (user) => {
 };
 
 const setAuthCookies = (res, tokens) => {
+  // Debug log to help trace cookie issues in logs
+  if (process.env.DEBUG_COOKIES === 'true') {
+    console.log('🍪 Setting Auth Cookies:', { secure: secureCookie, sameSite: sameSitePolicy, domain: authCookieOptions.domain || 'current' });
+  }
+
   res.cookie('access', tokens.accessToken, {
     ...authCookieOptions,
     maxAge: 15 * 60 * 1000 // 15 minutes
@@ -119,22 +120,18 @@ const clearAuthCookies = (res) => {
 };
 
 const sendOtpEmail = async (email, otp) => {
-  if (!otpTransporter) {
-    console.log(`[OTP] ${email} -> ${otp}`);
-    return;
-  }
-
   try {
-    await otpTransporter.sendMail({
-      from: OTP_EMAIL_FROM,
-      to: email,
-      subject: 'Your Mechanic Setu OTP',
-      text: `Your one-time password is ${otp}. It expires in ${OTP_EXPIRATION_MINUTES} minutes.`,
-      html: `<p>Your one-time password is <strong>${otp}</strong>. It expires in ${OTP_EXPIRATION_MINUTES} minutes.</p>`
-    });
+    const result = await deliverOtpEmail({ to: email, otp, expiresMinutes: OTP_EXPIRATION_MINUTES });
+    if (!result || !result.ok) {
+      console.error('Failed to deliver OTP email:', result);
+      return result || { ok: false, provider: 'console', error: 'Unknown delivery error' };
+    }
+
+    console.log('OTP email delivered:', { to: email, provider: result.provider, id: result.id || result.messageId || null });
+    return result;
   } catch (err) {
-    console.error('Failed to send OTP email:', err);
-    console.log(`[OTP fallback] ${email} -> ${otp}`);
+    console.error('Failed to deliver OTP email:', err);
+    return { ok: false, provider: 'console', error: err?.message || String(err) };
   }
 };
 
@@ -328,16 +325,24 @@ const loginSignUp = async (req, res) => {
     }
 
     const otpSession = await createOtpSession(user.id);
-    await sendOtpEmail(user.email, otpSession.otp);
+    const delivery = await sendOtpEmail(user.email, otpSession.otp);
 
     const status = isProfileComplete(user) ? 'Existing User' : 'New User';
 
-    res.json({
+    const payload = {
       key: otpSession.sessionKey,
       id: user.id,
       status,
-      created: userCreated
-    });
+      created: userCreated,
+      delivery
+    };
+
+    if (!delivery || !delivery.ok) {
+      // Email delivery failed — surface this to the client
+      return res.status(502).json(payload);
+    }
+
+    res.json(payload);
   } catch (error) {
     console.error('Login_SignUp Error:', error);
     res.status(500).json({ error: 'Unable to start OTP authentication.' });
@@ -357,9 +362,11 @@ const resendOtp = async (req, res) => {
     }
 
     const otpSession = await createOtpSession(user.id);
-    await sendOtpEmail(user.email, otpSession.otp);
+    const delivery = await sendOtpEmail(user.email, otpSession.otp);
 
-    res.json({ key: otpSession.sessionKey, id: user.id });
+    const payload = { key: otpSession.sessionKey, id: user.id, delivery };
+    if (!delivery || !delivery.ok) return res.status(502).json(payload);
+    res.json(payload);
   } catch (error) {
     console.error('resendOtp Error:', error);
     res.status(500).json({ error: 'Failed to resend OTP. Please try again.' });

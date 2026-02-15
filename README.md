@@ -178,6 +178,43 @@ RAPIDAPI_KEY_BACKUP=your_backup_rapidapi_key_here
 RAPIDAPI_KEY_BACKUP_1=your_second_backup_rapidapi_key_here
 ```
 
+## ✉️ OTP Email (SMTP)
+
+OTP emails are sent via Nodemailer (SMTP) by default.
+
+If you deploy to a platform that blocks outbound SMTP connections (common on serverless/free tiers), you will need to provide an external SMTP relay or run the email sending from an environment that allows outbound SMTP.
+
+If delivery fails, the server falls back to console logging **only in non-production** by default (set `OTP_LOG_IN_PROD=true` to force logging in production, not recommended).
+
+### Gmail SMTP (only supported provider)
+
+This project sends OTP emails using Gmail SMTP only (App Password or OAuth2).
+
+Gmail (App Password):
+
+```env
+SMTP_GMAIL_USER=youraddress@gmail.com
+SMTP_PASSWORD=your_gmail_app_password
+SMTP_REQUIRE_TLS=true
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_DEBUG=true
+OTP_EMAIL_FROM="Mechanic Setu" <youraddress@gmail.com>
+```
+
+Gmail (OAuth2):
+
+```env
+SMTP_GMAIL_USER=youraddress@gmail.com
+SMTP_GMAIL_OAUTH_CLIENT_ID=...
+SMTP_GMAIL_OAUTH_CLIENT_SECRET=...
+SMTP_GMAIL_OAUTH_REFRESH_TOKEN=...
+SMTP_DEBUG=true
+OTP_EMAIL_FROM="Mechanic Setu" <youraddress@gmail.com>
+```
+
+If SMTP connections are blocked by your hosting platform, configure an external SMTP relay or run the email sending from an environment that allows outbound SMTP. The code intentionally only supports Gmail to simplify configuration and logging.
+
 ## 🗃️ Database Tables
 
 ### MS_mechanic (New - No mandatory fields)

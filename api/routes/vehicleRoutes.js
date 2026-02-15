@@ -30,12 +30,12 @@ router.get('/my-vehicles', vehicleController.getMyVehicles);
  * GET /api/vehicle/saved/:vehicleId
  * Get specific vehicle from database by vehicle ID
  */
-// router.get('/saved/:vehicleId', vehicleController.getSavedVehicleById);
+router.get('/saved/:vehicleId', vehicleController.getMyVehicles);
 
 /**
  * DELETE /api/vehicle/saved/:vehicleId
  * Delete specific vehicle from database
  */
-// router.delete('/saved/:vehicleId', vehicleController.deleteSavedVehicle);
+router.delete('/saved/:vehicleId', vehicleController.deleteSavedVehicle);
 
 module.exports = router;

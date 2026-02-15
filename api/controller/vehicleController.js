@@ -82,36 +82,15 @@ const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
 const rcProviders = [
     {
-        name: "provider_1",
-        hostname: "vehicle-rc-verification-advance.p.rapidapi.com",
-        path: "/Getrcfulldetails",
-        method: "POST",
-        buildBody: (reg) => ({ rcnumber: reg })
-    },
-    {
-        name: "provider_2",
+        name: "rto_provider",
         hostname: "rto-vehicle-information-verification-india2.p.rapidapi.com",
         path: "/api/v1/private/rc-v1",
         method: "POST",
         buildBody: (reg) => ({
             reg_no: reg,
             consent: "yes",
-            consent_text:
-                "I hereby declare my consent agreement for fetching my information"
+            consent_text: "I hear by declare my consent agreement for fetching my information via Foxtail Kyc API"
         })
-    },
-    {
-        name: "provider_3",
-        hostname: "vehicle-rc-verification-rto.p.rapidapi.com",
-        path: "/rc-full",
-        method: "POST",
-        buildBody: (reg) => ({ id_number: reg })
-    },
-    {
-        name: "provider_4",
-        hostname: "rto-vehicle-details5.p.rapidapi.com",
-        path: (reg) => `/address?registration=${reg}`,
-        method: "GET"
     }
 ];
 
@@ -165,16 +144,19 @@ const makeProviderRequest = (provider, vehicleNumber) => {
    NORMALIZE DIFFERENT API RESPONSES
 ============================================================ */
 const normalizeResponse = (raw) => {
-    if (!raw) return null;
+    // The actual vehicle data is nested in the 'result' object.
+    const data = raw?.result;
+
+    if (!data) return null;
 
     return {
-        license_plate: raw.license_plate || raw.registration_no || raw.reg_no || raw.rc_number,
-        brand_name: raw.brand_name || raw.maker || raw.make,
-        brand_model: raw.brand_model || raw.model,
-        owner_name: raw.owner_name || raw.owner,
-        fuel_type: raw.fuel_type || raw.fuel,
-        class: raw.vehicle_class || raw.class,
-        raw_response: raw
+        license_plate: data.license_plate || data.registration_no || data.reg_no || data.rc_number,
+        brand_name: data.brand_name || data.maker || data.make,
+        brand_model: data.brand_model || data.model,
+        owner_name: data.owner_name || data.owner,
+        fuel_type: data.fuel_type || data.fuel_descr,
+        class: data.vehicle_class_desc || data.class,
+        raw_response: raw // Keep the full original response
     };
 };
 
@@ -276,16 +258,23 @@ const getVehicleRCInfo = async (req, res) => {
                 console.log(`Trying ${provider.name}...`);
                 const raw = await makeProviderRequest(provider, normalizedVehicleNumber);
 
+                // Log the raw response from the provider
+                console.log(`Response from ${provider.name}:`, JSON.stringify(raw, null, 2));
+
                 const normalized = normalizeResponse(raw);
 
                 if (normalized && normalized.license_plate) {
                     apiResponse = normalized;
                     providerUsed = provider.name;
+                    console.log(`Successfully found vehicle with ${provider.name}.`);
                     break;
+                } else {
+                    console.log(`No valid license plate in response from ${provider.name}.`);
                 }
 
             } catch (err) {
-                console.log(`${provider.name} failed`);
+                // Log the error from the provider
+                console.error(`Error with ${provider.name}:`, err);
             }
         }
 
@@ -361,7 +350,8 @@ const getSavedVehicles = async (req, res) => {
 
 const getMyVehicles = async (req, res) => {
     try {
-        const vehicleIdCandidate = req.query.vehicle_id || req.body.vehicle_id || req.params.vehicle_id || req.params.vehicleId;
+        // Safely access vehicle_id from query, body, or params
+        const vehicleIdCandidate = req.query.vehicle_id || (req.body || {}).vehicle_id || req.params.vehicle_id || req.params.vehicleId;
         const normalizedVehicleId = vehicleIdCandidate?.trim().toUpperCase();
 
         if (!normalizedVehicleId) {
@@ -398,8 +388,43 @@ const getMyVehicles = async (req, res) => {
     }
 };
 
+const deleteSavedVehicle = async (req, res) => {
+    try {
+        const vehicleIdCandidate = req.params.vehicleId;
+        const normalizedVehicleId = vehicleIdCandidate?.trim().toUpperCase();
+
+        if (!normalizedVehicleId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Vehicle ID is required.'
+            });
+        }
+
+        const result = await pool.query(
+            'DELETE FROM vehicle_rc_info WHERE vehicle_id = $1',
+            [normalizedVehicleId]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Vehicle not found or already deleted.'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Vehicle ${normalizedVehicleId} deleted successfully.`
+        });
+    } catch (error) {
+        console.error('Error deleting vehicle:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete vehicle.' });
+    }
+};
+
 module.exports = {
     getVehicleRCInfo,
     getSavedVehicles,
-    getMyVehicles
+    getMyVehicles,
+    deleteSavedVehicle
 };

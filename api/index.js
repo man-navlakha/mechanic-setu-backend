@@ -13,6 +13,12 @@ const authRoutes = require('./routes/authRoutes');
 const app = express();
 app.use(cookieParser());
 
+// Debug: Check Email Environment Variables on Startup
+console.log('--- 📧 Email Config Debug ---');
+console.log('SMTP_GMAIL_USER or SMTP_USER:', process.env.SMTP_GMAIL_USER || process.env.SMTP_USER ? 'SET' : 'NOT SET');
+console.log('SMTP configured check: see [api/helper/otpEmail.js] for details (transporter meta is logged on startup)');
+console.log('-----------------------------');
+
 // Simple request logger (for debugging routing/proxy issues)
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
@@ -44,6 +50,14 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+
+// Debug: Log Request Body (to see if email is passed correctly)
+app.use((req, _res, next) => {
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+        console.log('📦 Request Body:', JSON.stringify(req.body, null, 2));
+    }
+    next();
+});
 
 // ==================== ROUTES ====================
 
