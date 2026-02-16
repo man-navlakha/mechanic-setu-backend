@@ -422,9 +422,50 @@ const deleteSavedVehicle = async (req, res) => {
     }
 };
 
+const getUserVehicles = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not authenticated.'
+            });
+        }
+
+        const query = `
+            SELECT
+                uv.vehicle_id,
+                uv.is_owner,
+                uv.notification_enabled,
+                vri.*
+            FROM user_vehicles uv
+            JOIN vehicle_rc_info vri ON uv.vehicle_id = vri.vehicle_id
+            WHERE uv.user_id = $1
+            ORDER BY uv.created_at DESC;
+        `;
+
+        const result = await pool.query(query, [userId]);
+
+        res.status(200).json({
+            success: true,
+            count: result.rowCount,
+            data: result.rows
+        });
+
+    } catch (error) {
+        console.error('Error fetching user vehicles:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch user vehicles.'
+        });
+    }
+};
+
 module.exports = {
     getVehicleRCInfo,
     getSavedVehicles,
     getMyVehicles,
-    deleteSavedVehicle
+    deleteSavedVehicle,
+    getUserVehicles
 };

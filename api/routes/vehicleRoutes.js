@@ -21,10 +21,10 @@ router.get('/saved', vehicleController.getSavedVehicles);
 
 /**
  * GET /api/vehicle/my-vehicles
- * Returns vehicle details for a saved vehicle_id (frontend will pass vehicle_id)
- * Query example: ?vehicle_id=MH14GH8765
+ * Returns all vehicles saved by the currently authenticated user.
+ * This is a protected route.
  */
-router.get('/my-vehicles', vehicleController.getMyVehicles);
+router.get('/my-vehicles', authenticateToken, vehicleController.getUserVehicles);
 
 /**
  * GET /api/vehicle/saved/:vehicleId
