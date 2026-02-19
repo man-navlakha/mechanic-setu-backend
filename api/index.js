@@ -7,6 +7,7 @@ const healthRoutes = require('./routes/healthRoutes');
 const mechanicRoutes = require('./routes/mechanicRoutes');
 const msMechanicRoutes = require('./routes/msMechanicRoutes');
 const vehicleRoutes = require('./routes/vehicleRoutes');
+const jobRoutes = require('./routes/jobRoutes');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/authRoutes');
 
@@ -71,6 +72,7 @@ app.use('/', authRoutes);        // handles proxies that strip /api prefix
 app.use('/api/mechanics', mechanicRoutes);
 app.use('/api/ms-mechanics', msMechanicRoutes);
 app.use('/api/vehicle', vehicleRoutes);
+app.use('/api', jobRoutes);
 
 
 // Error handler

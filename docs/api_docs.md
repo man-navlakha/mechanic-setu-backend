@@ -69,6 +69,41 @@ curl http://localhost:3000/api/Profile/UserProfile
 -H "Cookie: access=YOUR_ACCESS_TOKEN"
 ```
 
+### Get User History (Authentication Required)
+Returns the vehicles you have looked up while logged in. The backend automatically saves a record whenever you fetch RC info with a valid `access` cookie.
+```bash
+# Replace YOUR_ACCESS_TOKEN with an actual access token
+curl http://localhost:3000/api/Profile/UserHistory \
+  -H "Cookie: access=YOUR_ACCESS_TOKEN"
+```
+
+Sample response
+```json
+{
+  "success": true,
+  "count": 2,
+  "data": [
+    {
+      "vehicle_id": "GJ27AA3978",
+      "is_owner": false,
+      "notification_enabled": true,
+      "id": 5,
+      "license_plate": "GJ27AA3978",
+      "brand_name": "Maruti Suzuki",
+      "brand_model": "Swift",
+      "owner_name": "Rahul Shah",
+      "fuel_type": "Petrol",
+      "class": "Hatchback",
+      "vehicle_image": "https://cdn.imagin.studio/getimage?customer=hrjavascript-mastery&make=maruti&modelFamily=swift&zoomType=fullscreen",
+      "raw_response": { "provider": "rto_provider", "reg_no": "GJ27AA3978" },
+      "last_synced_at": "2026-02-17T18:15:10.123Z",
+      "created_at": "2026-02-17T18:15:10.123Z",
+      "updated_at": "2026-02-17T18:15:10.123Z"
+    }
+  ]
+}
+```
+
 ### Logout (Authentication Required)
 ```bash
 # Replace YOUR_ACCESS_TOKEN and YOUR_CSRF_TOKEN with actual tokens from cookies

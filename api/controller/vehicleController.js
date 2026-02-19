@@ -1,6 +1,51 @@
 const https = require('https');
 const { URL } = require('url');
+const jwt = require('jsonwebtoken');
 const pool = require('../../db');
+
+// Reuse the same signing key used for access tokens (set in .env)
+const SIGNING_KEY = process.env.SIGNING_KEY;
+
+/**
+ * Attempt to read the authenticated user ID from the access cookie.
+ * This is intentionally non-fatal: if the token is missing/invalid we
+ * simply return null and continue serving the public endpoint.
+ */
+const getUserIdFromCookie = (req) => {
+    if (!SIGNING_KEY) return null;
+
+    const token = req.cookies?.access;
+    if (!token) return null;
+
+    try {
+        const decoded = jwt.verify(token, SIGNING_KEY, { algorithms: ['HS256'] });
+        return decoded?.user_id || null;
+    } catch (err) {
+        console.warn('getUserIdFromCookie: unable to decode access token', err.message);
+        return null;
+    }
+};
+
+/**
+ * Link the requested vehicle to the current user for history.
+ * Uses ON CONFLICT to keep the operation idempotent.
+ */
+const linkVehicleToUser = async (userId, vehicleId) => {
+    if (!userId || !vehicleId) return;
+
+    try {
+        await pool.query(
+            `
+            INSERT INTO user_vehicles (user_id, vehicle_id)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id, vehicle_id) DO NOTHING
+            `,
+            [userId, vehicleId]
+        );
+    } catch (error) {
+        console.error('Error linking vehicle to user history:', error);
+    }
+};
 
 /* ============================================================
    IMAGE GENERATOR (Same as your original)
@@ -230,6 +275,7 @@ const getVehicleRCInfo = async (req, res) => {
         }
 
         const normalizedVehicleNumber = vehicle_number.toUpperCase();
+        const userId = getUserIdFromCookie(req);
 
         /* -----------------------------
            STEP 1: CHECK DATABASE
@@ -240,6 +286,7 @@ const getVehicleRCInfo = async (req, res) => {
         );
 
         if (dbResult.rows.length > 0) {
+            await linkVehicleToUser(userId, normalizedVehicleNumber);
             return res.status(200).json({
                 success: true,
                 data: dbResult.rows[0],
@@ -289,6 +336,7 @@ const getVehicleRCInfo = async (req, res) => {
            STEP 3: SAVE TO DB
         ------------------------------*/
         const savedData = await saveVehicleRCInfo(apiResponse);
+        await linkVehicleToUser(userId, normalizedVehicleNumber);
 
         return res.status(200).json({
             success: true,

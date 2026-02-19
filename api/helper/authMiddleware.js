@@ -48,3 +48,17 @@ const authenticateToken = (req, res, next) => {
 };
 
 module.exports = { authenticateToken };
+
+// Optional variant: attaches user when present, but never blocks the request
+module.exports.authenticateOptional = (req, _res, next) => {
+    if (!SIGNING_KEY) return next();
+    const token = req.cookies?.access;
+    if (!token) return next();
+    try {
+        const decoded = jwt.verify(token, SIGNING_KEY, { algorithms: ['HS256'] });
+        req.user = { id: decoded.user_id, email: decoded.email };
+    } catch (_err) {
+        // ignore decode errors for optional auth
+    }
+    next();
+};
