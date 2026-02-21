@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS request_js (
     -- Vehicle & service context
     vehicle_id VARCHAR(20),
     vehicle_type VARCHAR(50),
+    vehicle_category VARCHAR(50),
     service_type VARCHAR(100),
     problem TEXT,
     additional_details TEXT,

@@ -1,5 +1,16 @@
 const pool = require('../../db');
 
+const inferVehicleCategory = (vehicleType) => {
+    const normalized = (vehicleType || '').toString().toLowerCase();
+
+    if (/auto|rickshaw|three/.test(normalized)) return 'autorickshaw';
+    if (/scooter|motorcycle|bike|2w|two[-\s]?wheeler/.test(normalized)) return 'bike';
+    if (/bus|coach/.test(normalized)) return 'bus';
+
+    // Default bucket for four-wheelers if some type is present
+    return normalized ? 'car' : null;
+};
+
 // Normalize and save a service/breakdown request into request_js
 exports.createServiceRequest = async (req, res) => {
     try {
@@ -12,6 +23,7 @@ exports.createServiceRequest = async (req, res) => {
 
         const vehicleId = (body.vehicle_id || body.vehicleId || body.vehicle_number || '').toString().trim() || null;
         const vehicleType = body.vehicle_type || body.vehical_type || null; // tolerate common typo
+        const vehicleCategory = body.vehicle_category || inferVehicleCategory(vehicleType);
 
         const serviceType = body.service_type || body.service || 'GENERAL_SERVICE';
         const problem = body.problem || serviceType || null;
@@ -34,18 +46,18 @@ exports.createServiceRequest = async (req, res) => {
         const insertQuery = `
             INSERT INTO request_js (
                 user_id, mechanic_id, vehicle_rc_id,
-                vehicle_id, vehicle_type, service_type,
+                vehicle_id, vehicle_type, vehicle_category, service_type,
                 problem, additional_details,
                 location, latitude, longitude,
                 preferred_date, preferred_time, preferred_day,
                 status, raw_payload
             ) VALUES (
                 $1,$2,$3,
-                $4,$5,$6,
-                $7,$8,
-                $9,$10,$11,
-                $12,$13,$14,
-                $15,$16
+                $4,$5,$6,$7,
+                $8,$9,
+                $10,$11,$12,
+                $13,$14,$15,
+                $16,$17
             )
             RETURNING *;
         `;
@@ -56,6 +68,7 @@ exports.createServiceRequest = async (req, res) => {
             vehicleRcId,
             vehicleId,
             vehicleType,
+            vehicleCategory,
             serviceType,
             problem,
             additionalDetails,
@@ -122,6 +135,7 @@ exports.getUserRequestHistory = async (req, res) => {
                 vehicle_rc_id,
                 vehicle_id,
                 vehicle_type,
+                vehicle_category,
                 service_type,
                 problem,
                 additional_details,

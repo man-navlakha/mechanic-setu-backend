@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS vehicle_rc_info (
     cylinders INTEGER,
     seating_capacity VARCHAR(10),
     vehicle_age VARCHAR(50),
+    vehicle_category VARCHAR(50),
     class VARCHAR(100),
     norms VARCHAR(50),
     

@@ -6,6 +6,69 @@ const pool = require('../../db');
 // Reuse the same signing key used for access tokens (set in .env)
 const SIGNING_KEY = process.env.SIGNING_KEY;
 
+// Derive a coarse vehicle category for UI badges
+const detectVehicleCategory = (vehicle = {}) => {
+    const lc = (value) => (value || '').toString().toLowerCase();
+
+    // Collect textual hints
+    const hints = [
+        lc(vehicle.class),
+        lc(vehicle.vehicle_type),
+        lc(vehicle.brand_model),
+        lc(vehicle.permit_type),
+        lc(vehicle.raw_response?.vehicle_class_desc),
+        lc(vehicle.raw_response?.result?.vehicle_class_desc),
+        lc(vehicle.raw_response?.result?.vehicle_catg),
+        lc(vehicle.raw_response?.result?.vehicle_type),
+        lc(vehicle.raw_response?.result?.body_type)
+    ].join(' ');
+
+    // Seats / capacity hints
+    const seatHint = parseInt(
+        vehicle.seating_capacity
+        || vehicle.raw_response?.result?.vehicle_seat_capacity
+        || vehicle.raw_response?.result?.seating_capacity,
+        10
+    );
+
+    if (/auto|rickshaw|autorick|three[-\s]?w/.test(hints)) return 'autorickshaw';
+    if (/scooter|m-cycle|motorcycle|bike|2w|two[-\s]?wheeler/.test(hints)) return 'bike';
+    if (/bus|coach/.test(hints)) return 'bus';
+    if (Number.isFinite(seatHint) && seatHint >= 20) return 'bus';
+    if (Number.isFinite(seatHint) && seatHint <= 3) return 'bike';
+
+    // Default bucket for four-wheelers
+    return 'car';
+};
+
+// Ensure category exists on row and persist back if newly derived
+const ensureVehicleCategory = async (row) => {
+    const derived = row?.vehicle_category || detectVehicleCategory(row);
+
+    // Persist back if the table has the column and we just derived it
+    if (!row?.vehicle_category && derived && row?.vehicle_id) {
+        try {
+            await pool.query(
+                'UPDATE vehicle_rc_info SET vehicle_category = $1 WHERE vehicle_id = $2',
+                [derived, row.vehicle_id]
+            );
+        } catch (err) {
+            console.warn('Failed to backfill vehicle_category:', err.message);
+        }
+    }
+
+    return derived;
+};
+
+const attachVehicleCategory = async (rows) => {
+    return Promise.all(
+        rows.map(async (row) => ({
+            ...row,
+            vehicle_category: await ensureVehicleCategory(row)
+        }))
+    );
+};
+
 /**
  * Attempt to read the authenticated user ID from the access cookie.
  * This is intentionally non-fatal: if the token is missing/invalid we
@@ -82,14 +145,15 @@ const saveVehicleRCInfo = async (vehicleData) => {
     const vehicleImage =
         vehicleData.vehicle_image ||
         generateCarImageUrl(vehicleData.brand_name, vehicleData.brand_model, vehicleData.class);
+    const vehicleCategory = vehicleData.vehicle_category || detectVehicleCategory(vehicleData);
 
     const query = `
         INSERT INTO vehicle_rc_info (
             vehicle_id, license_plate, brand_name, brand_model,
-            owner_name, fuel_type, class,
+            owner_name, fuel_type, class, vehicle_category,
             vehicle_image, raw_response, last_synced_at
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
         ON CONFLICT (vehicle_id)
         DO UPDATE SET
             license_plate = EXCLUDED.license_plate,
@@ -98,6 +162,7 @@ const saveVehicleRCInfo = async (vehicleData) => {
             owner_name = EXCLUDED.owner_name,
             fuel_type = EXCLUDED.fuel_type,
             class = EXCLUDED.class,
+            vehicle_category = COALESCE(EXCLUDED.vehicle_category, vehicle_rc_info.vehicle_category),
             vehicle_image = EXCLUDED.vehicle_image,
             raw_response = EXCLUDED.raw_response,
             last_synced_at = NOW()
@@ -112,6 +177,7 @@ const saveVehicleRCInfo = async (vehicleData) => {
         vehicleData.owner_name,
         vehicleData.fuel_type,
         vehicleData.class,
+        vehicleCategory,
         vehicleImage,
         JSON.stringify(vehicleData)
     ];
@@ -287,9 +353,10 @@ const getVehicleRCInfo = async (req, res) => {
 
         if (dbResult.rows.length > 0) {
             await linkVehicleToUser(userId, normalizedVehicleNumber);
+            const category = await ensureVehicleCategory(dbResult.rows[0]);
             return res.status(200).json({
                 success: true,
-                data: dbResult.rows[0],
+                data: { ...dbResult.rows[0], vehicle_category: category },
                 source: 'database'
             });
         }
@@ -338,9 +405,14 @@ const getVehicleRCInfo = async (req, res) => {
         const savedData = await saveVehicleRCInfo(apiResponse);
         await linkVehicleToUser(userId, normalizedVehicleNumber);
 
+        const vehicleCategory = savedData?.vehicle_category || detectVehicleCategory(apiResponse);
+
         return res.status(200).json({
             success: true,
-            data: apiResponse,
+            data: {
+                ...apiResponse,
+                vehicle_category: vehicleCategory
+            },
             provider_used: providerUsed,
             saved_to_db: !!savedData,
             vehicle_image: apiResponse.vehicle_image
@@ -383,12 +455,14 @@ const getSavedVehicles = async (req, res) => {
         const result = await pool.query(query, queryParams);
         const countResult = await pool.query(countQuery, params);
 
+        const dataWithCategory = await attachVehicleCategory(result.rows);
+
         res.status(200).json({
             success: true,
             total: parseInt(countResult.rows[0].count),
             page_size: parseInt(limit),
             offset: parseInt(offset),
-            data: result.rows
+            data: dataWithCategory
         });
     } catch (error) {
         console.error('Error fetching saved vehicles:', error);
@@ -421,7 +495,11 @@ const getMyVehicles = async (req, res) => {
             });
         }
 
-        const formatted = buildVehicleDetailsResponse(result.rows[0]);
+        const row = result.rows[0];
+        const formatted = {
+            ...buildVehicleDetailsResponse(row),
+            vehicle_category: await ensureVehicleCategory(row)
+        };
 
         return res.status(200).json({
             success: true,
@@ -495,10 +573,12 @@ const getUserVehicles = async (req, res) => {
 
         const result = await pool.query(query, [userId]);
 
+        const dataWithCategory = await attachVehicleCategory(result.rows);
+
         res.status(200).json({
             success: true,
             count: result.rowCount,
-            data: result.rows
+            data: dataWithCategory
         });
 
     } catch (error) {
