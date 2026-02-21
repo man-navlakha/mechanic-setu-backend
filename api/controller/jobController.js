@@ -81,3 +81,84 @@ exports.createServiceRequest = async (req, res) => {
         return res.status(500).json({ success: false, error: 'Failed to create service request' });
     }
 };
+
+// Fetch the authenticated user's service/breakdown request history
+exports.getUserRequestHistory = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ success: false, error: 'User not authenticated.' });
+        }
+
+        const { limit = 50, offset = 0, status, vehicle_id } = req.query;
+
+        // Keep pagination bounded to avoid accidental heavy queries
+        const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+        const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
+
+        const clauses = ['user_id = $1'];
+        const params = [userId];
+        let paramIndex = 2;
+
+        if (status) {
+            clauses.push(`status = $${paramIndex}`);
+            params.push(status);
+            paramIndex++;
+        }
+
+        if (vehicle_id) {
+            clauses.push(`vehicle_id ILIKE $${paramIndex}`);
+            params.push(`%${vehicle_id}%`);
+            paramIndex++;
+        }
+
+        const whereSql = clauses.join(' AND ');
+
+        const dataQuery = `
+            SELECT
+                id,
+                mechanic_id,
+                vehicle_rc_id,
+                vehicle_id,
+                vehicle_type,
+                service_type,
+                problem,
+                additional_details,
+                location,
+                latitude,
+                longitude,
+                preferred_date,
+                preferred_time,
+                preferred_day,
+                status,
+                created_at,
+                updated_at
+            FROM request_js
+            WHERE ${whereSql}
+            ORDER BY created_at DESC
+            LIMIT $${paramIndex}
+            OFFSET $${paramIndex + 1};
+        `;
+
+        const dataParams = [...params, safeLimit, safeOffset];
+
+        const countQuery = `SELECT COUNT(*) FROM request_js WHERE ${whereSql};`;
+
+        const [countResult, dataResult] = await Promise.all([
+            pool.query(countQuery, params),
+            pool.query(dataQuery, dataParams)
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            count: parseInt(countResult.rows[0]?.count || '0', 10),
+            page_size: safeLimit,
+            offset: safeOffset,
+            data: dataResult.rows
+        });
+    } catch (error) {
+        console.error('Error fetching user request history:', error);
+        return res.status(500).json({ success: false, error: 'Failed to fetch request history' });
+    }
+};

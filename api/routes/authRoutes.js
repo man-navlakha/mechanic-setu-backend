@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controller/authController');
 const vehicleController = require('../controller/vehicleController');
+const { getUserRequestHistory } = require('../controller/jobController');
 const { authenticateToken } = require('../helper/authMiddleware');
 const { ensureCsrfToken } = require('../helper/csrfMiddleware');
 
@@ -20,7 +21,8 @@ POST(
   authController.setUsersDetail
 );
 GET(['/Profile/UserProfile/', '/Profile/UserProfile'], authenticateToken, authController.getUserProfile);
-GET(['/Profile/UserHistory/', '/Profile/UserHistory'], authenticateToken, vehicleController.getUserVehicles);
+GET(['/Profile/UserHistory/', '/Profile/UserHistory'], authenticateToken, getUserRequestHistory);
+GET(['/Profile/UserVehicles/', '/Profile/UserVehicles'], authenticateToken, vehicleController.getUserVehicles);
 POST(['/users/logout/', '/users/logout'], authenticateToken, ensureCsrfToken, authController.logout);
 GET(['/core/me/', '/core/me'], authenticateToken, authController.me);
 POST(['/core/me/', '/core/me'], authenticateToken, authController.me);
