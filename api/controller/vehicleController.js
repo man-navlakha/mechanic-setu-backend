@@ -293,36 +293,127 @@ const calculateAgeFromRegistrationDate = (registrationDate) => {
 const buildVehicleDetailsResponse = (vehicle) => {
     if (!vehicle) return null;
 
+    // Helper to pick the first non-null/undefined value
+    const coalesce = (...values) => {
+        for (const val of values) {
+            if (val !== undefined && val !== null) return val;
+        }
+        return null;
+    };
+
+    // raw_response is stored as JSONB; provider payload may be nested
+    const raw = vehicle.raw_response || {};
+    const rawResult =
+        raw.result ||
+        raw.raw_response?.result ||
+        raw.raw_response?.data ||
+        raw.data ||
+        null;
+
     const computedAge = calculateAgeFromRegistrationDate(vehicle.registration_date);
 
     return {
         id: vehicle.id ? vehicle.id.toString() : null,
         vehicle_id: vehicle.vehicle_id,
         license_plate: vehicle.license_plate,
-        brand_name: vehicle.brand_name,
-        brand_model: vehicle.brand_model,
-        fuel_type: vehicle.fuel_type,
-        color: vehicle.color,
-        seating_capacity: vehicle.seating_capacity,
+        chassis_number: coalesce(vehicle.chassis_number, rawResult?.chassis_no, rawResult?.chasis_no),
+        engine_number: coalesce(vehicle.engine_number, rawResult?.engine_no, rawResult?.engine_number),
+        brand_name: coalesce(
+            vehicle.brand_name,
+            rawResult?.brand_name,
+            rawResult?.maker,
+            rawResult?.make,
+            rawResult?.vehicle_manufacturer_name
+        ),
+        brand_model: coalesce(vehicle.brand_model, rawResult?.brand_model, rawResult?.model, rawResult?.model_name),
+        fuel_type: coalesce(vehicle.fuel_type, rawResult?.fuel_type, rawResult?.fuel_descr),
+        color: coalesce(vehicle.color, rawResult?.color),
+        cubic_capacity: coalesce(vehicle.cubic_capacity, rawResult?.cubic_cap, rawResult?.cubic_capacity),
+        cylinders: coalesce(vehicle.cylinders, rawResult?.cylinders_no, rawResult?.cylinders),
+        seating_capacity: coalesce(
+            vehicle.seating_capacity,
+            rawResult?.vehicle_seat_capacity,
+            rawResult?.seating_capacity
+        ),
         vehicle_age: vehicle.vehicle_age || computedAge,
-        owner_name: vehicle.owner_name,
-        father_name: vehicle.father_name,
-        owner_count: vehicle.owner_count,
-        present_address: vehicle.present_address,
-        permanent_address: vehicle.permanent_address,
-        registration_date: vehicle.registration_date,
-        rc_status: vehicle.rc_status,
-        is_financed: vehicle.is_financed,
-        financer: vehicle.financer,
-        noc_details: vehicle.noc_details,
-        insurance_company: vehicle.insurance_company,
-        insurance_policy: vehicle.insurance_policy,
-        insurance_expiry: vehicle.insurance_expiry,
-        pucc_number: vehicle.pucc_number,
-        engine_number: vehicle.engine_number,
+        class: coalesce(vehicle.class, rawResult?.vehicle_class_desc, rawResult?.class, rawResult?.body_type),
+        norms: coalesce(vehicle.norms, rawResult?.norms_descr, rawResult?.emission_norms),
+        owner_name: coalesce(vehicle.owner_name, rawResult?.owner_name),
+        father_name: coalesce(vehicle.father_name, rawResult?.owner_father_name),
+        owner_count: coalesce(vehicle.owner_count, rawResult?.owner_count, rawResult?.owner_no),
+        present_address: coalesce(
+            vehicle.present_address,
+            rawResult?.current_full_address,
+            rawResult?.current_address_line1
+        ),
+        permanent_address: coalesce(
+            vehicle.permanent_address,
+            rawResult?.permanent_full_address,
+            rawResult?.permanent_address_line1
+        ),
+        registration_date: coalesce(vehicle.registration_date, rawResult?.reg_date, rawResult?.registration_date),
+        rc_status: coalesce(vehicle.rc_status, rawResult?.status, rawResult?.rc_status),
+        source: vehicle.source || rawResult?.source || null,
+        is_financed: coalesce(vehicle.is_financed, rawResult?.is_financed, rawResult?.financer_details ? 'true' : null),
+        financer: coalesce(vehicle.financer, rawResult?.financer, rawResult?.financer_details?.name),
+        noc_details: coalesce(vehicle.noc_details, rawResult?.noc_details),
+        insurance_company: coalesce(
+            vehicle.insurance_company,
+            rawResult?.vehicle_insurance_details?.insurance_company_name,
+            rawResult?.insurance_company
+        ),
+        insurance_policy: coalesce(
+            vehicle.insurance_policy,
+            rawResult?.vehicle_insurance_details?.policy_no,
+            rawResult?.policy_no
+        ),
+        insurance_expiry: coalesce(
+            vehicle.insurance_expiry,
+            rawResult?.vehicle_insurance_details?.insurance_upto,
+            rawResult?.insurance_upto
+        ),
+        tax_paid_upto: coalesce(vehicle.tax_paid_upto, rawResult?.tax_paid_upto),
+        tax_upto: coalesce(vehicle.tax_upto, rawResult?.tax_upto),
+        permit_type: coalesce(vehicle.permit_type, rawResult?.permit_details?.permit_type, rawResult?.permit_type),
+        permit_number: coalesce(vehicle.permit_number, rawResult?.permit_details?.permit_no, rawResult?.permit_number),
+        permit_issue_date: coalesce(
+            vehicle.permit_issue_date,
+            rawResult?.permit_details?.issue_date,
+            rawResult?.permit_issue_date
+        ),
+        permit_valid_from: coalesce(
+            vehicle.permit_valid_from,
+            rawResult?.permit_details?.valid_from,
+            rawResult?.permit_valid_from
+        ),
+        permit_valid_upto: coalesce(
+            vehicle.permit_valid_upto,
+            rawResult?.permit_details?.valid_upto,
+            rawResult?.permit_valid_upto
+        ),
+        national_permit_number: coalesce(
+            vehicle.national_permit_number,
+            rawResult?.permit_details?.national_permit_number,
+            rawResult?.national_permit_number
+        ),
+        national_permit_issued_by: coalesce(
+            vehicle.national_permit_issued_by,
+            rawResult?.permit_details?.national_permit_issued_by,
+            rawResult?.national_permit_issued_by
+        ),
+        national_permit_upto: coalesce(
+            vehicle.national_permit_upto,
+            rawResult?.permit_details?.national_permit_upto,
+            rawResult?.national_permit_upto
+        ),
+        pucc_number: coalesce(vehicle.pucc_number, rawResult?.vehicle_pucc_details?.pucc_no, rawResult?.pucc_no),
+        pucc_upto: coalesce(vehicle.pucc_upto, rawResult?.vehicle_pucc_details?.pucc_upto, rawResult?.pucc_upto),
         vehicle_image: vehicle.vehicle_image,
-        chassis_number: vehicle.chassis_number,
-        cubic_capacity: vehicle.cubic_capacity
+        vehicle_category: vehicle.vehicle_category,
+        raw_response: vehicle.raw_response,
+        created_at: vehicle.created_at,
+        updated_at: vehicle.updated_at,
+        last_synced_at: vehicle.last_synced_at
     };
 };
 
@@ -605,6 +696,26 @@ const updateSavedVehicle = async (req, res) => {
             'pucc_upto',
             'vehicle_image'
         ];
+
+        // Safety net: in case migrations were not applied, ensure the vehicle_category column exists
+        // so updates with vehicle_category don't fail in production.
+        if (updates.vehicle_category) {
+            try {
+                await pool.query(`
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_name = 'vehicle_rc_info' AND column_name = 'vehicle_category'
+                        ) THEN
+                            ALTER TABLE vehicle_rc_info ADD COLUMN vehicle_category VARCHAR(50);
+                        END IF;
+                    END$$;
+                `);
+            } catch (e) {
+                console.warn('ensure vehicle_category column failed:', e.message);
+            }
+        }
 
         const setClauses = [];
         const values = [];
