@@ -700,6 +700,17 @@ const refreshTokens = async (req, res) => {
   }
 };
 
+// Not recommended: exposes HttpOnly cookie token to JS.
+// Prefer using cookies + `credentials: 'include'` and calling /core/me instead.
+const getAccessToken = (req, res) => {
+  const token = req.cookies?.access;
+  if (!token) {
+    return res.status(401).json({ error: 'Access token cookie is missing.' });
+  }
+
+  res.json({ access: token });
+};
+
 module.exports = {
   loginSignUp,
   verifyOtp,
@@ -709,5 +720,6 @@ module.exports = {
   getUserProfile,
   logout,
   me,
-  refreshTokens
+  refreshTokens,
+  getAccessToken
 };

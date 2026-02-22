@@ -27,5 +27,6 @@ POST(['/users/logout/', '/users/logout'], authenticateToken, ensureCsrfToken, au
 GET(['/core/me/', '/core/me'], authenticateToken, authController.me);
 POST(['/core/me/', '/core/me'], authenticateToken, authController.me);
 POST(['/core/token/refresh/', '/core/token/refresh'], authController.refreshTokens);
+GET(['/core/token/', '/core/token'], authenticateToken, authController.getAccessToken);
 
 module.exports = router;
