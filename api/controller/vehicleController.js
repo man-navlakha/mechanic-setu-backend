@@ -113,29 +113,18 @@ const linkVehicleToUser = async (userId, vehicleId) => {
 /* ============================================================
    IMAGE GENERATOR (Same as your original)
 ============================================================ */
-const generateCarImageUrl = (make, model, vehicleClass) => {
-    if (!make || !model) return null;
+const generateCarImageUrl = (_make, model) => {
+    if (!model) return null;
 
-    const lowerClass = (vehicleClass || "").toLowerCase();
+    // Use brand_model in a slug form (lowercase, spaces => underscores) to build the local asset URL
+    const brandModelSlug = model
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[\\/]+/g, '_') // change slashes to underscores
+        .replace(/\s+/g, '_');   // spaces to underscores
 
-    if (lowerClass.includes('motor') || lowerClass.includes('scooter')) {
-        return "https://img.freepik.com/premium-vector/scooter-delivery-transportation-isolated-icon-vector-illustration-design_25030-10115.jpg";
-    }
-
-    if (lowerClass.includes('three') || lowerClass.includes('rickshaw')) {
-        return "https://img.freepik.com/premium-vector/auto-rickshaw-illustration-indian-three-wheeler-vehicle-isolated_25030-61882.jpg";
-    }
-
-    const cleanMake = make.split(' ')[0].toLowerCase();
-    const cleanModel = model.split(' ')[0].toLowerCase();
-
-    const url = new URL("https://cdn.imagin.studio/getimage");
-    url.searchParams.append('customer', 'hrjavascript-mastery');
-    url.searchParams.append('make', cleanMake);
-    url.searchParams.append('modelFamily', cleanModel);
-    url.searchParams.append('zoomType', 'fullscreen');
-
-    return url.toString();
+    return `https://img-server-theta.vercel.app/api/vehicle/${brandModelSlug}`;
 };
 
 /* ============================================================
