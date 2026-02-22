@@ -155,6 +155,7 @@ Content-Type: application/json
 **Additional Endpoints:**
 - `GET /api/vehicle/saved` - Get all saved vehicles
 - `GET /api/vehicle/saved/:vehicleId` - Get specific vehicle from DB
+- `PATCH /api/vehicle/saved/:vehicleId` - Update specific vehicle details in DB
 - `DELETE /api/vehicle/saved/:vehicleId` - Delete saved vehicle
 
 **Response:**

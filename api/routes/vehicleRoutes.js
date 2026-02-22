@@ -33,6 +33,12 @@ router.get('/my-vehicles', authenticateToken, vehicleController.getUserVehicles)
 router.get('/saved/:vehicleId', vehicleController.getMyVehicles);
 
 /**
+ * PATCH /api/vehicle/saved/:vehicleId
+ * Update specific vehicle details in database
+ */
+router.patch('/saved/:vehicleId', vehicleController.updateSavedVehicle);
+
+/**
  * DELETE /api/vehicle/saved/:vehicleId
  * Delete specific vehicle from database
  */

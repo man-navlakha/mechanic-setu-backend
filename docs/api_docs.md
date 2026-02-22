@@ -227,6 +227,13 @@ curl "http://localhost:3000/api/vehicle/my-vehicles?vehicle_id=MH14GH8765"
 curl "http://localhost:3000/api/vehicle/saved/GJ01VW9893"
 ```
 
+### Update Saved Vehicle by ID
+```bash
+curl -X PATCH "http://localhost:3000/api/vehicle/saved/GJ01VW9893" \
+  -H "Content-Type: application/json" \
+  -d '{"owner_name": "Updated Owner", "fuel_type": "Petrol"}'
+```
+
 ### Delete Saved Vehicle by ID
 ```bash
 curl -X DELETE "http://localhost:3000/api/vehicle/saved/GJ01VW9893"

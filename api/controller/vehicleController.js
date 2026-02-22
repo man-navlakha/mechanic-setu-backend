@@ -548,6 +548,123 @@ const deleteSavedVehicle = async (req, res) => {
     }
 };
 
+const updateSavedVehicle = async (req, res) => {
+    try {
+        const vehicleIdCandidate = req.params.vehicleId;
+        const normalizedVehicleId = vehicleIdCandidate?.trim().toUpperCase();
+
+        if (!normalizedVehicleId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Vehicle ID is required.'
+            });
+        }
+
+        const updates = req.body || {};
+
+        const allowedFields = [
+            'license_plate',
+            'chassis_number',
+            'engine_number',
+            'brand_name',
+            'brand_model',
+            'fuel_type',
+            'color',
+            'cubic_capacity',
+            'cylinders',
+            'seating_capacity',
+            'vehicle_age',
+            'vehicle_category',
+            'class',
+            'norms',
+            'owner_name',
+            'father_name',
+            'owner_count',
+            'present_address',
+            'permanent_address',
+            'registration_date',
+            'rc_status',
+            'source',
+            'is_financed',
+            'financer',
+            'noc_details',
+            'insurance_company',
+            'insurance_policy',
+            'insurance_expiry',
+            'tax_paid_upto',
+            'tax_upto',
+            'permit_type',
+            'permit_number',
+            'permit_issue_date',
+            'permit_valid_from',
+            'permit_valid_upto',
+            'national_permit_number',
+            'national_permit_issued_by',
+            'national_permit_upto',
+            'pucc_number',
+            'pucc_upto',
+            'vehicle_image'
+        ];
+
+        const setClauses = [];
+        const values = [];
+        let paramIndex = 1;
+
+        for (const [key, value] of Object.entries(updates)) {
+            if (allowedFields.includes(key)) {
+                const columnName = key === 'class' ? '"class"' : key;
+                setClauses.push(`${columnName} = $${paramIndex}`);
+                values.push(value);
+                paramIndex++;
+            }
+        }
+
+        if (setClauses.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No valid fields to update.'
+            });
+        }
+
+        values.push(normalizedVehicleId);
+
+        const result = await pool.query(
+            `
+            UPDATE vehicle_rc_info
+            SET ${setClauses.join(', ')}
+            WHERE vehicle_id = $${paramIndex}
+            RETURNING *
+            `,
+            values
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Vehicle not found.'
+            });
+        }
+
+        const row = result.rows[0];
+        const formatted = {
+            ...buildVehicleDetailsResponse(row),
+            vehicle_category: await ensureVehicleCategory(row)
+        };
+
+        return res.status(200).json({
+            success: true,
+            message: `Vehicle ${normalizedVehicleId} updated successfully.`,
+            data: formatted
+        });
+    } catch (error) {
+        console.error('Error updating vehicle:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to update vehicle.'
+        });
+    }
+};
+
 const getUserVehicles = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -594,6 +711,7 @@ module.exports = {
     getVehicleRCInfo,
     getSavedVehicles,
     getMyVehicles,
+    updateSavedVehicle,
     deleteSavedVehicle,
     getUserVehicles
 };
