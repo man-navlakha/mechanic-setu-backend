@@ -185,6 +185,7 @@ curl -X PATCH http://localhost:3000/api/ms-mechanics/123
 ```bash
 curl -X DELETE http://localhost:3000/api/ms-mechanics/123
 ```
+> Alias: the same controller also answers `DELETE http://localhost:3000/api/ms-mechanics/123/deleted` if you want a more descriptive path.
 
 ### Update MS Mechanic Location
 ```bash

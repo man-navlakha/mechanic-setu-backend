@@ -8,6 +8,7 @@ router.post('/', msMechanicController.createMsMechanic);
 router.get('/:id', msMechanicController.getMsMechanicById);
 router.patch('/:id', msMechanicController.updateMsMechanic);
 router.delete('/:id', msMechanicController.deleteMsMechanic);
+router.delete('/:id/deleted', msMechanicController.deleteMsMechanic);
 router.put('/:id/location', msMechanicController.updateMsMechanicLocation);
 router.put('/:id/status', msMechanicController.updateMsMechanicStatus);
 

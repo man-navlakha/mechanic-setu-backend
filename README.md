@@ -108,6 +108,8 @@ Content-Type: application/json
 DELETE /api/ms-mechanics/:id
 ```
 
+You can also call `DELETE /api/ms-mechanics/:id/deleted` as an alias to the same controller; it simply routes to the existing delete handler so the record is removed just as if you hit the primary endpoint.
+
 ### Update Location
 ```
 PUT /api/ms-mechanics/:id/location
