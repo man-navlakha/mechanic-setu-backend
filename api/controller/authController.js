@@ -10,6 +10,7 @@ const ACCESS_TOKEN_LIFETIME = process.env.ACCESS_TOKEN_LIFETIME || '15m';
 const REFRESH_TOKEN_LIFETIME = process.env.REFRESH_TOKEN_LIFETIME || '7d';
 const OTP_EXPIRATION_MINUTES = parseInt(process.env.OTP_EXPIRATION_MINUTES || '5', 10);
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const REFRESH_TOKENS_TABLE = 'auth_refresh_tokens';
 
 // For cross-site cookies (e.g., frontend at 5173, backend at 3000),
 // SameSite must be 'None' and the cookie must be 'Secure'.
@@ -63,10 +64,14 @@ const mapUserForClient = (user) => ({
   mobile_number: user.mobile_number || ''
 });
 
-const buildTokens = (user) => {
+const parseJwtExpiryToDate = (jwtSecondsSinceEpoch) => new Date(jwtSecondsSinceEpoch * 1000);
+
+const buildTokens = (user, options = {}) => {
   if (!SIGNING_KEY) {
     throw new Error('SIGNING_KEY is not configured');
   }
+
+  const refreshJti = options.refreshJti || uuidv4();
 
   const sharedPayload = {
     user_id: user.id,
@@ -83,7 +88,7 @@ const buildTokens = (user) => {
   );
 
   const refreshToken = jwt.sign(
-    { ...sharedPayload, token_type: 'refresh' },
+    { ...sharedPayload, token_type: 'refresh', jti: refreshJti },
     SIGNING_KEY,
     {
       algorithm: 'HS256',
@@ -91,7 +96,35 @@ const buildTokens = (user) => {
     }
   );
 
-  return { accessToken, refreshToken };
+  return { accessToken, refreshToken, refreshJti };
+};
+
+const persistRefreshToken = async ({ userId, refreshToken, refreshJti }) => {
+  const decoded = jwt.decode(refreshToken);
+  const expiresAt = decoded?.exp ? parseJwtExpiryToDate(decoded.exp) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const tokenHash = hashValue(refreshToken);
+
+  const isMissingRefreshTable = (error) => error?.code === '42P01'
+    && typeof error?.message === 'string'
+    && error.message.includes(`relation \"${REFRESH_TOKENS_TABLE}\" does not exist`);
+
+  await pool.query(
+    `
+      INSERT INTO ${REFRESH_TOKENS_TABLE} (user_id, jti, token_hash, expires_at)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (jti) DO NOTHING
+    `,
+    [userId, refreshJti, tokenHash, expiresAt]
+  ).catch((error) => {
+    if (isMissingRefreshTable(error)) {
+      const err = new Error(`Missing table ${REFRESH_TOKENS_TABLE}. Run migrations to enable refresh token rotation/blacklisting.`);
+      err.code = 'MISSING_REFRESH_TABLE';
+      throw err;
+    }
+    throw error;
+  });
+
+  return { expiresAt };
 };
 
 const setAuthCookies = (res, tokens) => {
@@ -413,6 +446,14 @@ const verifyOtp = async (req, res) => {
     await pool.query('UPDATE users_customuser SET last_login = NOW() WHERE id = $1', [user.id]);
 
     const tokens = buildTokens(user);
+    try {
+      await persistRefreshToken({ userId: user.id, refreshToken: tokens.refreshToken, refreshJti: tokens.refreshJti });
+    } catch (error) {
+      if (error?.code === 'MISSING_REFRESH_TABLE') {
+        return res.status(503).json({ error: error.message });
+      }
+      throw error;
+    }
     setAuthCookies(res, tokens);
 
     res.json({
@@ -465,6 +506,14 @@ const googleLogin = async (req, res) => {
     const status = newUser || !isProfileComplete(user) ? 'New User' : 'Existing User';
 
     const tokens = buildTokens(user);
+    try {
+      await persistRefreshToken({ userId: user.id, refreshToken: tokens.refreshToken, refreshJti: tokens.refreshJti });
+    } catch (error) {
+      if (error?.code === 'MISSING_REFRESH_TABLE') {
+        return res.status(503).json({ error: error.message });
+      }
+      throw error;
+    }
     setAuthCookies(res, tokens);
     await pool.query('UPDATE users_customuser SET last_login = NOW() WHERE id = $1', [user.id]);
 
@@ -600,7 +649,44 @@ const refreshTokens = async (req, res) => {
       return res.status(404).json({ error: 'User not found.' });
     }
 
+    const presentedJti = decoded.jti;
+    if (!presentedJti) {
+      return res.status(401).json({ error: 'Refresh token is missing jti.' });
+    }
+
+    const presentedHash = hashValue(rawRefreshToken);
+    const existing = await pool.query(
+      `
+        SELECT id, revoked_at, expires_at
+        FROM ${REFRESH_TOKENS_TABLE}
+        WHERE user_id = $1 AND jti = $2 AND token_hash = $3
+        LIMIT 1
+      `,
+      [user.id, presentedJti, presentedHash]
+    );
+
+    if (!existing.rows.length) {
+      return res.status(401).json({ error: 'Refresh token is not recognized.' });
+    }
+
+    const tokenRow = existing.rows[0];
+    if (tokenRow.revoked_at) {
+      return res.status(401).json({ error: 'Refresh token has been revoked.' });
+    }
+
     const tokens = buildTokens(user);
+
+    // ROTATE_REFRESH_TOKENS=True, BLACKLIST_AFTER_ROTATION=True
+    await pool.query(
+      `
+        UPDATE ${REFRESH_TOKENS_TABLE}
+        SET revoked_at = NOW(), replaced_by = $1, last_used_at = NOW()
+        WHERE user_id = $2 AND jti = $3 AND revoked_at IS NULL
+      `,
+      [tokens.refreshJti, user.id, presentedJti]
+    );
+
+    await persistRefreshToken({ userId: user.id, refreshToken: tokens.refreshToken, refreshJti: tokens.refreshJti });
     setAuthCookies(res, tokens);
 
     res.json({

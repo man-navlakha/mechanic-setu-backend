@@ -4,19 +4,38 @@ const pool = require('../db');
 
 async function runMigration() {
     try {
-        console.log('🔄 Running vehicle RC table migration...');
+        const arg = process.argv[2];
+        const migrationsDir = __dirname;
 
-        // Read the SQL file
-        const sqlFile = path.join(__dirname, 'create_vehicle_rc_table.sql');
-        const sql = fs.readFileSync(sqlFile, 'utf8');
+        const runSqlFile = async (filename) => {
+            const sqlFile = path.join(migrationsDir, filename);
+            const sql = fs.readFileSync(sqlFile, 'utf8');
+            console.log(`🔄 Applying migration: ${filename}`);
+            await pool.query(sql);
+            console.log(`✅ Applied: ${filename}`);
+        };
 
-        // Execute the SQL
-        await pool.query(sql);
+        if (arg) {
+            await runSqlFile(arg);
+            process.exit(0);
+        }
 
-        console.log('✅ Migration completed successfully!');
-        console.log('   - Created table: vehicle_rc_info');
-        console.log('   - Created indexes for vehicle_id, license_plate, owner_name');
-        console.log('   - Created automatic updated_at trigger');
+        const sqlFiles = fs.readdirSync(migrationsDir)
+            .filter((name) => name.toLowerCase().endsWith('.sql'))
+            .sort((a, b) => a.localeCompare(b));
+
+        if (!sqlFiles.length) {
+            console.log('ℹ️ No .sql files found in migrations/');
+            process.exit(0);
+        }
+
+        console.log(`🔄 Running ${sqlFiles.length} migration(s)...`);
+        for (const filename of sqlFiles) {
+            // Files are written with IF NOT EXISTS and safe to re-run.
+            await runSqlFile(filename);
+        }
+
+        console.log('🎉 All migrations applied successfully.');
 
         process.exit(0);
     } catch (error) {
