@@ -34,7 +34,7 @@ const MOBILE_REGEX = /^\+?\d{7,15}$/;
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 const authCookieOptions = {
-  httpOnly: true,
+  httpOnly: false,
   secure: secureCookie,
   sameSite: sameSitePolicy,
   path: COOKIE_PATH
