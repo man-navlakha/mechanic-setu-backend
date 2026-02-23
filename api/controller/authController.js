@@ -70,16 +70,21 @@ const buildTokens = (user, options = {}) => {
   if (!SIGNING_KEY) {
     throw new Error('SIGNING_KEY is not configured');
   }
+  if (!user.id) {
+    console.error("❌ Token generation failed: User object missing ID", user);
+    throw new Error('User ID is required to build tokens');
+  }
 
   const refreshJti = options.refreshJti || uuidv4();
 
   const sharedPayload = {
     user_id: user.id,
-    email: user.email
+    email: user.email,
+    id: user.id,      // Fallback for some configurations
   };
 
   const accessToken = jwt.sign(
-    { ...sharedPayload, token_type: 'access' },
+    { ...sharedPayload, token_type: 'access', jti: uuidv4()},
     SIGNING_KEY,
     {
       algorithm: 'HS256',
