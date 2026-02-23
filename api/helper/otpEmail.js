@@ -152,7 +152,46 @@ const shouldLogOtpFallback = () => {
 const deliverOtpEmail = async ({ to, otp, expiresMinutes }) => {
   const subject = 'Your Mechanic Setu OTP';
   const text = `Your one-time password is ${otp}. It expires in ${expiresMinutes} minutes.`;
-  const html = `<p>Your one-time password is <strong>${otp}</strong>. It expires in ${expiresMinutes} minutes.</p>`;
+  const html = `
+    <div style="margin:0;padding:0;background-color:#f6f7fb;">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f6f7fb;padding:24px 0;">
+        <tr>
+          <td align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:520px;background:#ffffff;border-radius:12px;box-shadow:0 6px 18px rgba(22,34,51,0.08);">
+              <tr>
+                <td style="padding:24px 28px 16px 28px;border-bottom:1px solid #eef1f6;">
+                  <div style="font-family:Arial, Helvetica, sans-serif;font-size:18px;font-weight:700;color:#0f1a2b;">
+                    Mechanic Setu
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:24px 28px 8px 28px;">
+                  <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;color:#1f2a3a;line-height:1.5;">
+                    Use the OTP below to sign in. It expires in ${expiresMinutes} minutes.
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding:12px 28px 20px 28px;">
+                  <div style="font-family:Arial, Helvetica, sans-serif;font-size:28px;letter-spacing:4px;font-weight:700;color:#0f1a2b;background:#f1f5ff;border:1px solid #d6e2ff;padding:12px 20px;border-radius:10px;display:inline-block;">
+                    ${otp}
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:0 28px 24px 28px;">
+                  <div style="font-family:Arial, Helvetica, sans-serif;font-size:13px;color:#6b7280;line-height:1.5;">
+                    If you did not request this, you can safely ignore this email.
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
 
   try {
     if (!smtpTransporter) {
@@ -182,4 +221,3 @@ const deliverOtpEmail = async ({ to, otp, expiresMinutes }) => {
 module.exports = {
   deliverOtpEmail
 };
-
