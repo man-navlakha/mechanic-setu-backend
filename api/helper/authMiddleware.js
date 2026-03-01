@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 // This must match the key used in Django SimpleJWT for HS256 signing.
 const SIGNING_KEY = process.env.SIGNING_KEY;
 
+
 /**
  * Middleware to authenticate a user via JWT in the 'access' cookie.
  * This mirrors Django's CookieJWTAuthentication and is used by protected routes.
@@ -18,7 +19,7 @@ const authenticateToken = (req, res, next) => {
     }
 
     // 2. Extract token from the 'access' cookie
-    const token = req.cookies.access;
+    const token = req.cookies?.access;
 
     if (!token) {
         console.warn('[authMiddleware] No access cookie. headers.cookie=', req.headers.cookie);

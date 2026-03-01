@@ -10,6 +10,7 @@ const vehicleRoutes = require('./routes/vehicleRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/authRoutes');
+const profileRoutes = require('./routes/profileRoutes');
 
 const app = express();
 app.use(cookieParser());
@@ -68,6 +69,8 @@ app.use('/', healthRoutes);
 // Auth routes mounted at multiple prefixes to tolerate dev proxy misconfigs
 app.use('/api', authRoutes);
 app.use('/', authRoutes);        // handles proxies that strip /api prefix
+app.use('/api', profileRoutes);
+app.use('/', profileRoutes);
 
 app.use('/api/mechanics', mechanicRoutes);
 app.use('/api/ms-mechanics', msMechanicRoutes);
