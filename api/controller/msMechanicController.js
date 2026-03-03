@@ -36,7 +36,7 @@ exports.getAllMsMechanics = async (req, res) => {
 
 exports.getNearbyMsMechanics = async (req, res) => {
     try {
-        const { latitude, longitude, radius = 10, limit = 20, onlineOnly = false } = req.query;
+        const { latitude, longitude, radius = 10, limit = 20, onlineOnly = false, service_id } = req.query;
 
         if (!latitude || !longitude) {
             return res.status(400).json({
@@ -59,6 +59,8 @@ exports.getNearbyMsMechanics = async (req, res) => {
 
         const result = await pool.query(query);
 
+        const parsedServiceId = service_id ? parseInt(service_id, 10) : null;
+
         const mechanicsWithDistance = result.rows
             .map(m => {
                 const mechanicLat = m.current_latitude || m.shop_latitude;
@@ -67,6 +69,7 @@ exports.getNearbyMsMechanics = async (req, res) => {
                 return { ...m, distance_km: distance, distance_text: distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance} km` };
             })
             .filter(m => m.distance_km <= searchRadius)
+            .filter(m => !parsedServiceId || (Array.isArray(m.service_ids) && m.service_ids.includes(parsedServiceId)))
             .sort((a, b) => a.distance_km - b.distance_km)
             .slice(0, maxResults);
 
@@ -185,7 +188,7 @@ exports.updateMsMechanic = async (req, res) => {
             'profile_photo', 'shop_photo', 'shop_google_map_link',
             'special_skills', 'vehicle_type',
             'electric', 'electric_vehicle_types',
-            'fuel_delivery_types', 'services_offered', 'working_hours'
+            'fuel_delivery_types', 'services_offered', 'working_hours', 'service_ids'
         ];
 
         const setClauses = [];

@@ -11,6 +11,10 @@ const jobRoutes = require('./routes/jobRoutes');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const serviceRoutes = require('./routes/serviceRoutes');
+const adminUserRoutes = require('./routes/adminUserRoutes');
+const adminServiceRequestRoutes = require('./routes/adminServiceRequestRoutes');
+const adminStatsRoutes = require('./routes/adminStatsRoutes');
 
 const app = express();
 app.use(cookieParser());
@@ -76,6 +80,10 @@ app.use('/api/mechanics', mechanicRoutes);
 app.use('/api/ms-mechanics', msMechanicRoutes);
 app.use('/api/vehicle', vehicleRoutes);
 app.use('/api', jobRoutes);
+app.use('/api', serviceRoutes);
+app.use('/api', adminUserRoutes);
+app.use('/api', adminServiceRequestRoutes);
+app.use('/api', adminStatsRoutes);
 
 
 // Error handler

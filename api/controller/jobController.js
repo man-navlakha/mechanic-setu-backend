@@ -26,6 +26,7 @@ exports.createServiceRequest = async (req, res) => {
         const vehicleCategory = body.vehicle_category || inferVehicleCategory(vehicleType);
 
         const serviceType = body.service_type || body.service || 'GENERAL_SERVICE';
+        const serviceId = body.service_id ? parseInt(body.service_id, 10) : null;
         const problem = body.problem || serviceType || null;
         const additionalDetails = body.additional_details || body.notes || null;
 
@@ -47,17 +48,17 @@ exports.createServiceRequest = async (req, res) => {
             INSERT INTO request_js (
                 user_id, mechanic_id, vehicle_rc_id,
                 vehicle_id, vehicle_type, vehicle_category, service_type,
-                problem, additional_details,
+                service_id, problem, additional_details,
                 location, latitude, longitude,
                 preferred_date, preferred_time, preferred_day,
                 status, raw_payload
             ) VALUES (
                 $1,$2,$3,
                 $4,$5,$6,$7,
-                $8,$9,
-                $10,$11,$12,
-                $13,$14,$15,
-                $16,$17
+                $8,$9,$10,
+                $11,$12,$13,
+                $14,$15,$16,
+                $17,$18
             )
             RETURNING *;
         `;
@@ -70,6 +71,7 @@ exports.createServiceRequest = async (req, res) => {
             vehicleType,
             vehicleCategory,
             serviceType,
+            serviceId,
             problem,
             additionalDetails,
             location,
