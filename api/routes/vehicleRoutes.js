@@ -12,6 +12,28 @@ const { authenticateToken } = require('../helper/authMiddleware');
 router.post('/rc-info', vehicleController.getVehicleRCInfo);
 
 /**
+ * POST /api/vehicle/manual-add
+ * Manually add vehicle with all details (instead of fetching from API)
+ * Body: { vehicle_number, license_plate, brand_name, brand_model, owner_name, fuel_type, class, ... }
+ */
+router.post('/manual-add', vehicleController.addVehicleManually);
+
+/**
+ * POST /api/vehicle/mymotor
+ * Add vehicle from MyMotor API response
+ * Body: { status, data: { key_information, vehicle_details, insurance_details, puc_details } }
+ */
+router.post('/mymotor', vehicleController.addVehicleFromMyMotor);
+
+/**
+ * GET /api/vehicle/generate-image
+ * Generate vehicle image URL from model name
+ * Query: ?model=Swift or ?brand_model=Maruti%20Swift
+ * Curl: curl "http://localhost:3000/api/vehicle/generate-image?model=Swift"
+ */
+router.get('/generate-image', vehicleController.generateVehicleImage);
+
+/**
  * GET /api/vehicle/saved
  * Get all saved vehicles from database
  * Query: ?limit=50&offset=0&search=search_term

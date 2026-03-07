@@ -128,7 +128,7 @@ const generateCarImageUrl = (_make, model) => {
 };
 
 /* ============================================================
-   SAVE VEHICLE TO DB (Same UPSERT logic)
+   SAVE VEHICLE TO DB (Extended to save all fields)
 ============================================================ */
 const saveVehicleRCInfo = async (vehicleData) => {
     const vehicleImage =
@@ -138,19 +138,66 @@ const saveVehicleRCInfo = async (vehicleData) => {
 
     const query = `
         INSERT INTO vehicle_rc_info (
-            vehicle_id, license_plate, brand_name, brand_model,
-            owner_name, fuel_type, class, vehicle_category,
-            vehicle_image, raw_response, last_synced_at
+            vehicle_id, license_plate, chassis_number, engine_number,
+            brand_name, brand_model, fuel_type, color,
+            cubic_capacity, cylinders, seating_capacity, vehicle_age,
+            class, norms, owner_name, father_name, owner_count,
+            present_address, permanent_address, registration_date,
+            rc_status, source, is_financed, financer, noc_details,
+            insurance_company, insurance_policy, insurance_expiry,
+            tax_paid_upto, tax_upto, permit_type, permit_number,
+            permit_issue_date, permit_valid_from, permit_valid_upto,
+            national_permit_number, national_permit_issued_by, national_permit_upto,
+            pucc_number, pucc_upto, vehicle_category, vehicle_image, raw_response, last_synced_at
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+        VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+            $31, $32, $33, $34, $35, $36, $37, $38, $39, $40,
+            $41, $42, $43, NOW()
+        )
         ON CONFLICT (vehicle_id)
         DO UPDATE SET
             license_plate = EXCLUDED.license_plate,
+            chassis_number = EXCLUDED.chassis_number,
+            engine_number = EXCLUDED.engine_number,
             brand_name = EXCLUDED.brand_name,
             brand_model = EXCLUDED.brand_model,
-            owner_name = EXCLUDED.owner_name,
             fuel_type = EXCLUDED.fuel_type,
+            color = EXCLUDED.color,
+            cubic_capacity = EXCLUDED.cubic_capacity,
+            cylinders = EXCLUDED.cylinders,
+            seating_capacity = EXCLUDED.seating_capacity,
+            vehicle_age = EXCLUDED.vehicle_age,
             class = EXCLUDED.class,
+            norms = EXCLUDED.norms,
+            owner_name = EXCLUDED.owner_name,
+            father_name = EXCLUDED.father_name,
+            owner_count = EXCLUDED.owner_count,
+            present_address = EXCLUDED.present_address,
+            permanent_address = EXCLUDED.permanent_address,
+            registration_date = EXCLUDED.registration_date,
+            rc_status = EXCLUDED.rc_status,
+            source = EXCLUDED.source,
+            is_financed = EXCLUDED.is_financed,
+            financer = EXCLUDED.financer,
+            noc_details = EXCLUDED.noc_details,
+            insurance_company = EXCLUDED.insurance_company,
+            insurance_policy = EXCLUDED.insurance_policy,
+            insurance_expiry = EXCLUDED.insurance_expiry,
+            tax_paid_upto = EXCLUDED.tax_paid_upto,
+            tax_upto = EXCLUDED.tax_upto,
+            permit_type = EXCLUDED.permit_type,
+            permit_number = EXCLUDED.permit_number,
+            permit_issue_date = EXCLUDED.permit_issue_date,
+            permit_valid_from = EXCLUDED.permit_valid_from,
+            permit_valid_upto = EXCLUDED.permit_valid_upto,
+            national_permit_number = EXCLUDED.national_permit_number,
+            national_permit_issued_by = EXCLUDED.national_permit_issued_by,
+            national_permit_upto = EXCLUDED.national_permit_upto,
+            pucc_number = EXCLUDED.pucc_number,
+            pucc_upto = EXCLUDED.pucc_upto,
             vehicle_category = COALESCE(EXCLUDED.vehicle_category, vehicle_rc_info.vehicle_category),
             vehicle_image = EXCLUDED.vehicle_image,
             raw_response = EXCLUDED.raw_response,
@@ -159,13 +206,46 @@ const saveVehicleRCInfo = async (vehicleData) => {
     `;
 
     const values = [
+        vehicleData.vehicle_id || vehicleData.license_plate,
         vehicleData.license_plate,
-        vehicleData.license_plate,
-        vehicleData.brand_name,
-        vehicleData.brand_model,
-        vehicleData.owner_name,
-        vehicleData.fuel_type,
-        vehicleData.class,
+        vehicleData.chassis_number || null,
+        vehicleData.engine_number || null,
+        vehicleData.brand_name || '',
+        vehicleData.brand_model || '',
+        vehicleData.fuel_type || null,
+        vehicleData.color || null,
+        vehicleData.cubic_capacity || null,
+        vehicleData.cylinders || null,
+        vehicleData.seating_capacity || null,
+        vehicleData.vehicle_age || null,
+        vehicleData.class || '',
+        vehicleData.norms || null,
+        vehicleData.owner_name || null,
+        vehicleData.father_name || null,
+        vehicleData.owner_count || null,
+        vehicleData.present_address || null,
+        vehicleData.permanent_address || null,
+        vehicleData.registration_date || null,
+        vehicleData.rc_status || null,
+        vehicleData.source || null,
+        vehicleData.is_financed || null,
+        vehicleData.financer || null,
+        vehicleData.noc_details || null,
+        vehicleData.insurance_company || null,
+        vehicleData.insurance_policy || null,
+        vehicleData.insurance_expiry || null,
+        vehicleData.tax_paid_upto || null,
+        vehicleData.tax_upto || null,
+        vehicleData.permit_type || null,
+        vehicleData.permit_number || null,
+        vehicleData.permit_issue_date || null,
+        vehicleData.permit_valid_from || null,
+        vehicleData.permit_valid_upto || null,
+        vehicleData.national_permit_number || null,
+        vehicleData.national_permit_issued_by || null,
+        vehicleData.national_permit_upto || null,
+        vehicleData.pucc_number || null,
+        vehicleData.pucc_upto || null,
         vehicleCategory,
         vehicleImage,
         JSON.stringify(vehicleData)
@@ -807,11 +887,234 @@ const getUserVehicles = async (req, res) => {
     }
 };
 
+/* ============================================================
+   MANUAL VEHICLE ADD - Accept complete API response JSON
+============================================================ */
+const addVehicleManually = async (req, res) => {
+    try {
+        const vehicleData = req.body;
+
+        // Validation - vehicle_id or vehicle_number is required
+        const vehicleId = vehicleData.vehicle_id || vehicleData.license_plate || vehicleData.vehicle_number;
+        
+        if (!vehicleId) {
+            return res.status(400).json({
+                success: false,
+                error: 'vehicle_id, license_plate, or vehicle_number is required'
+            });
+        }
+
+        if (!vehicleData.license_plate) {
+            return res.status(400).json({
+                success: false,
+                error: 'license_plate is required'
+            });
+        }
+
+        const normalizedVehicleId = vehicleId.toUpperCase();
+        const userId = getUserIdFromCookie(req);
+
+        // Prepare data for saving - extract top-level fields
+        const dataToSave = {
+            license_plate: vehicleData.license_plate,
+            brand_name: vehicleData.brand_name || '',
+            brand_model: vehicleData.brand_model || '',
+            owner_name: vehicleData.owner_name || '',
+            fuel_type: vehicleData.fuel_type || '',
+            class: vehicleData.class || '',
+            color: vehicleData.color || '',
+            vehicle_image: vehicleData.vehicle_image || generateCarImageUrl(vehicleData.brand_name, vehicleData.brand_model, vehicleData.class),
+            vehicle_category: vehicleData.vehicle_category || null,  // Will be detected automatically if null
+            // Store the entire incoming object as raw_response
+            raw_response: vehicleData.raw_response ? vehicleData.raw_response : {
+                provider: 'manual_entry',
+                manual_entry: true,
+                added_at: new Date().toISOString(),
+                ...vehicleData
+            }
+        };
+
+        // Save vehicle to database using the same function as /rc-info
+        const savedVehicle = await saveVehicleRCInfo({
+            ...dataToSave,
+            license_plate: normalizedVehicleId  // Use vehicle_id as the key
+        });
+
+        // Link vehicle to user if authenticated
+        await linkVehicleToUser(userId, normalizedVehicleId);
+
+        // Get vehicle category
+        const category = await ensureVehicleCategory(savedVehicle);
+        const responseData = { ...savedVehicle, vehicle_category: category };
+
+        return res.status(201).json({
+            success: true,
+            data: responseData,
+            source: 'manual_entry'
+        });
+    } catch (error) {
+        console.error('Error adding vehicle manually:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to add vehicle manually'
+        });
+    }
+};
+
+/* ============================================================
+   GENERATE VEHICLE IMAGE URL
+============================================================ */
+const generateVehicleImage = async (req, res) => {
+    try {
+        const { model, brand_model } = req.query;
+
+        // Use brand_model or model parameter
+        const vehicleModel = brand_model || model;
+
+        if (!vehicleModel) {
+            return res.status(400).json({
+                success: false,
+                error: 'model or brand_model query parameter is required'
+            });
+        }
+
+        // Generate the image URL using the same logic
+        const imageUrl = generateCarImageUrl(null, vehicleModel);
+
+        return res.status(200).json({
+            success: true,
+            model: vehicleModel,
+            vehicle_image: imageUrl,
+            url_slug: vehicleModel
+                .toString()
+                .trim()
+                .toLowerCase()
+                .replace(/[\\/]+/g, '_')
+                .replace(/\s+/g, '_')
+        });
+    } catch (error) {
+        console.error('Error generating vehicle image:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to generate vehicle image URL'
+        });
+    }
+};
+
+/* ============================================================
+   ADD VEHICLE FROM MYMOTOR API RESPONSE
+============================================================ */
+const addVehicleFromMyMotor = async (req, res) => {
+    try {
+        const myMotorData = req.body;
+
+        // Validate required data structure
+        if (!myMotorData.data || !myMotorData.data.key_information) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid MyMotor response format. Expected data.key_information'
+            });
+        }
+
+        const keyInfo = myMotorData.data.key_information || {};
+        const vehicleDetails = myMotorData.data.vehicle_details || {};
+        const insuranceDetails = myMotorData.data.insurance_details || {};
+        const pucDetails = myMotorData.data.puc_details || {};
+
+        // Extract vehicle ID from rc_reg_no
+        const vehicleId = keyInfo.rc_reg_no;
+        
+        if (!vehicleId) {
+            return res.status(400).json({
+                success: false,
+                error: 'rc_reg_no is required in key_information'
+            });
+        }
+
+        const normalizedVehicleId = vehicleId.toUpperCase();
+        const userId = getUserIdFromCookie(req);
+
+        // Map MyMotor response to vehicle data structure
+        const vehicleData = {
+            vehicle_id: normalizedVehicleId,
+            license_plate: normalizedVehicleId,
+            chassis_number: vehicleDetails.rc_chassis_number || null,
+            engine_number: vehicleDetails.rc_engine_number || null,
+            brand_name: vehicleDetails.manufacturer || '',
+            brand_model: vehicleDetails.model_name || '',
+            fuel_type: vehicleDetails.fuel_type || null,
+            color: vehicleDetails.color || null,
+            cubic_capacity: vehicleDetails.vehicle_cubic_capacity ? parseFloat(vehicleDetails.vehicle_cubic_capacity) : null,
+            cylinders: vehicleDetails.vehicle_number_of_cylinders || null,
+            seating_capacity: vehicleDetails.vehicle_seating_capacity || null,
+            vehicle_age: null,
+            class: vehicleDetails.vehicle_class || '',
+            norms: pucDetails.emission_norm || null,
+            owner_name: keyInfo.owner_name || null,
+            father_name: keyInfo.father_name || null,
+            owner_count: null,
+            present_address: keyInfo.user_present_address || null,
+            permanent_address: keyInfo.user_permanent_address || null,
+            registration_date: keyInfo.registration_date || null,
+            rc_status: keyInfo.rc_status || null,
+            source: 'mymotor',
+            is_financed: keyInfo.vehicle_financed ? true : false,
+            financer: keyInfo.financer || null,
+            noc_details: keyInfo.rc_noc_details || null,
+            insurance_company: insuranceDetails.insurance_company || null,
+            insurance_policy: insuranceDetails.policy_number || null,
+            insurance_expiry: insuranceDetails.insurance_valid_upto || null,
+            tax_paid_upto: null,
+            tax_upto: vehicleDetails.rc_tax_upto || null,
+            permit_type: vehicleDetails.rc_permit_type || null,
+            permit_number: vehicleDetails.rc_permit_number || null,
+            permit_issue_date: vehicleDetails.rc_permit_issued_date || null,
+            permit_valid_from: vehicleDetails.rc_permit_start_date || null,
+            permit_valid_upto: vehicleDetails.rc_permit_expiry_date || null,
+            national_permit_number: vehicleDetails.national_permit_number || null,
+            national_permit_issued_by: vehicleDetails.national_permit_issued_by || null,
+            national_permit_upto: vehicleDetails.national_permit_expiry_date || null,
+            pucc_number: pucDetails.rc_pucc_no || null,
+            pucc_upto: pucDetails.expiry_date || null,
+            vehicle_image: null, // Will be generated
+            raw_response: myMotorData // Store entire response
+        };
+
+        // Generate image URL
+        vehicleData.vehicle_image = generateCarImageUrl(vehicleData.brand_name, vehicleData.brand_model, vehicleData.class);
+
+        // Save vehicle to database
+        const savedVehicle = await saveVehicleRCInfo(vehicleData);
+        
+        // Link vehicle to user if authenticated
+        await linkVehicleToUser(userId, normalizedVehicleId);
+
+        // Get vehicle category
+        const category = await ensureVehicleCategory(savedVehicle);
+        const responseData = { ...savedVehicle, vehicle_category: category };
+
+        return res.status(201).json({
+            success: true,
+            data: responseData,
+            source: 'mymotor'
+        });
+    } catch (error) {
+        console.error('Error adding vehicle from MyMotor:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to add vehicle from MyMotor'
+        });
+    }
+};
+
 module.exports = {
     getVehicleRCInfo,
     getSavedVehicles,
     getMyVehicles,
     updateSavedVehicle,
     deleteSavedVehicle,
-    getUserVehicles
+    getUserVehicles,
+    addVehicleManually,
+    generateVehicleImage,
+    addVehicleFromMyMotor
 };

@@ -20,6 +20,9 @@ const adminVehicleRoutes = require('./routes/adminVehicleRoutes');
 const app = express();
 app.use(cookieParser());
 
+// ⚠️ JSON Parser MUST come before any middleware that accesses req.body
+app.use(express.json({ limit: '50mb' })); // Support large JSON payloads
+
 // // Debug: Check Email Environment Variables on Startup
 // console.log('--- 📧 Email Config Debug ---');
 // console.log('SMTP_GMAIL_USER or SMTP_USER:', process.env.SMTP_GMAIL_USER || process.env.SMTP_USER ? 'SET' : 'NOT SET');
@@ -90,7 +93,6 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
-app.use(express.json());
 
 // ==================== ROUTES ====================
 
