@@ -7,8 +7,8 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "start": "node api/index.js",
-    "dev": "node --watch api/index.js",
+    "start": "node --no-warnings api/index.js",
+    "dev": "node --watch --no-warnings api/index.js",
     "vercel-build": "echo 'Build complete'",
     "email:test": "node scripts/send-test-otp.js",
     "test": "echo \"Error: no test specified\" && exit 1"

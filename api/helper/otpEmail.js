@@ -88,9 +88,9 @@ const buildSmtpTransporter = () => {
 buildSmtpTransporter();
 
 if (smtpTransporterMeta) {
-  console.log('[SMTP] configured:', smtpTransporterMeta);
+  // console.log('[SMTP] configured:', smtpTransporterMeta);
 } else {
-  console.log('[SMTP] not configured; OTP will use fallback delivery.');
+  // console.log('[SMTP] not configured; OTP will use fallback delivery.');
 }
 
 const verifySmtpOnce = async () => {

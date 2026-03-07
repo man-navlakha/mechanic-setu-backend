@@ -15,25 +15,60 @@ const serviceRoutes = require('./routes/serviceRoutes');
 const adminUserRoutes = require('./routes/adminUserRoutes');
 const adminServiceRequestRoutes = require('./routes/adminServiceRequestRoutes');
 const adminStatsRoutes = require('./routes/adminStatsRoutes');
+const adminVehicleRoutes = require('./routes/adminVehicleRoutes');
 
 const app = express();
 app.use(cookieParser());
 
-// Debug: Check Email Environment Variables on Startup
-console.log('--- 📧 Email Config Debug ---');
-console.log('SMTP_GMAIL_USER or SMTP_USER:', process.env.SMTP_GMAIL_USER || process.env.SMTP_USER ? 'SET' : 'NOT SET');
-console.log('SMTP configured check: see [api/helper/otpEmail.js] for details (transporter meta is logged on startup)');
-console.log('-----------------------------');
+// // Debug: Check Email Environment Variables on Startup
+// console.log('--- 📧 Email Config Debug ---');
+// console.log('SMTP_GMAIL_USER or SMTP_USER:', process.env.SMTP_GMAIL_USER || process.env.SMTP_USER ? 'SET' : 'NOT SET');
+// console.log('SMTP configured check: see [api/helper/otpEmail.js] for details (transporter meta is logged on startup)');
+// console.log('-----------------------------');
 
 // Simple request logger (for debugging routing/proxy issues)
 app.use((req, _res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-  next();
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+    next();
+});
+
+// Debug: Log Request Body (to see if email is passed correctly)
+app.use((req, _res, next) => {
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+        console.log('📦 Request Body:', JSON.stringify(req.body, null, 2));
+    }
+    next();
+});
+
+// Debug: Display current request being processed
+app.use((req, _res, next) => {
+    let service = 'Unknown';
+
+    if (req.originalUrl.includes('/api/vehicle')) {
+        service = 'Vehicle Service';
+    } else if (req.originalUrl.includes('/api/mechanics')) {
+        service = 'Mechanic Service';
+    } else if (req.originalUrl.includes('/api/auth')) {
+        service = 'Authentication Service';
+    } else if (req.originalUrl.includes('/api/job')) {
+        service = 'Job Service';
+    } else if (req.originalUrl.includes('/api/service')) {
+        service = 'Service Management';
+    } else if (req.originalUrl.includes('/api/admin')) {
+        service = 'Admin Service';
+    }
+
+    console.log(`Processing request: ${req.method} ${req.originalUrl} | Service: ${service}`);
+    console.log(`Request Origin: ${req.headers.origin || 'Unknown Origin'}`);
+    console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+    next();
 });
 
 // Middleware
 const allowedOrigins = [
     'http://localhost:5173',
+    'http://localhost:5174',
     'http://localhost:3000',
     'https://mechanicsetu.netlify.app',
     'https://mechanic-setu.vercel.app', // Add your production URL here
@@ -57,14 +92,6 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Debug: Log Request Body (to see if email is passed correctly)
-app.use((req, _res, next) => {
-    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
-        console.log('📦 Request Body:', JSON.stringify(req.body, null, 2));
-    }
-    next();
-});
-
 // ==================== ROUTES ====================
 
 // Use Routes
@@ -78,6 +105,8 @@ app.use('/', profileRoutes);
 
 app.use('/api/mechanics', mechanicRoutes);
 app.use('/api/ms-mechanics', msMechanicRoutes);
+app.use('/api', adminVehicleRoutes);
+app.use('/', adminVehicleRoutes); // handles proxies that strip /api prefix
 app.use('/api/vehicle', vehicleRoutes);
 app.use('/api', jobRoutes);
 app.use('/api', serviceRoutes);
@@ -95,8 +124,17 @@ module.exports = app;
 // Start server (Vercel sets VERCEL=1, so this won't run on Vercel)
 if (!process.env.VERCEL) {
     const PORT = process.env.PORT || 3000;
+    const os = require('os');
+    
     app.listen(PORT, '0.0.0.0', () => {
-        console.log(`🚀 Server running on:`);
-        console.log(`   Local:   http://localhost:${PORT}`);
+        const networkInterfaces = os.networkInterfaces();
+        const localIPv4 = Object.values(networkInterfaces)
+            .flat()
+            .find(addr => addr.family === 'IPv4' && !addr.internal)?.address || 'N/A';
+        
+        console.log(`\n🚀 Server running on:`);
+        console.log(`   Local:    http://localhost:${PORT}`);
+        console.log(`   Network:  http://${localIPv4}:${PORT}`);
+        console.log(`\n✅ Ready for development!\n`);
     });
 }
