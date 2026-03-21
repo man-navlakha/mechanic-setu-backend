@@ -2,6 +2,7 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
+const pool = require('../db');
 const errorHandler = require('./helper/errorHandler');
 const healthRoutes = require('./routes/healthRoutes');
 const mechanicRoutes = require('./routes/mechanicRoutes');
@@ -71,6 +72,11 @@ app.use((req, _res, next) => {
 // Middleware
 const allowedOrigins = [
     'http://localhost:5173',
+    'https://api.mechanicsetu.tech',
+    'https://*.mechanicsetu.tech',
+    'http://*.mechanicsetu.tech',
+    'https://mechanicsetu.tech',
+    'http://mechanicsetu.tech',
     'http://localhost:5174',
     'http://localhost:3000',
     'https://mechanicsetu.netlify.app',
@@ -138,5 +144,17 @@ if (!process.env.VERCEL) {
         console.log(`   Local:    http://localhost:${PORT}`);
         console.log(`   Network:  http://${localIPv4}:${PORT}`);
         console.log(`\n✅ Ready for development!\n`);
+
+        pool.query('SELECT 1')
+            .then(() => {
+                console.log('🗄️ Database connection check: OK');
+            })
+            .catch((error) => {
+                if (error?.code === '28P01') {
+                    console.error('🗄️ Database connection check failed: invalid DATABASE_URL credentials (Postgres 28P01).');
+                    return;
+                }
+                console.error('🗄️ Database connection check failed:', error.message);
+            });
     });
 }

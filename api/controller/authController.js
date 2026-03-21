@@ -345,6 +345,10 @@ const isValidUUID = (value) => {
   return uuidRegex.test(value.trim());
 };
 
+const isDatabaseCredentialError = (error) => {
+  return error?.code === '28P01';
+};
+
 const loginSignUp = async (req, res) => {
   try {
     const { email } = req.body || {};
@@ -383,6 +387,11 @@ const loginSignUp = async (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error('Login_SignUp Error:', error);
+    if (isDatabaseCredentialError(error)) {
+      return res.status(503).json({
+        error: 'Database authentication failed. Please verify DATABASE_URL credentials.'
+      });
+    }
     res.status(500).json({ error: 'Unable to start OTP authentication.' });
   }
 };
